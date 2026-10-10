@@ -106,8 +106,17 @@ for arg in "$@"; do
   [ "$arg" = "--rascunho" ] && extra="--draft"
 done
 
+# A tag é criada no GitHub em cima do main de lá: a versão nova do Info.plist
+# precisa estar lá antes.
+if ! git diff --quiet -- "$PLIST"; then
+  git commit -q -m "Versão $versao" -- "$PLIST"
+fi
+echo "==> enviando para o GitHub"
+git push -q origin HEAD
+
 echo "==> publicando v$versao"
 gh release create "v$versao" \
+  --target "$(git rev-parse HEAD)" \
   --title "BispoTv $versao" \
   --notes-file "$notas" \
   $extra \

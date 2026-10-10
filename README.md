@@ -84,16 +84,12 @@ rode `./build.sh` e commite. Se houver conflito, o arquivo fica com marcas
 ## Publicar uma versão
 
 ```bash
-./release.sh 2.1.2              # marca a versão e publica
-./release.sh 2.1.2 --rascunho   # cria como rascunho
+./release.sh 2.1.2              # marca a versão, monta o DMG e publica no release
 ```
 
-O script grava a versão no `Info.plist`, monta o DMG e publica no release; o
-app instalado procura a versão nova ali e oferece a atualização. As notas saem
-de `build/release/NOTAS.md` quando esse arquivo existe.
-
-Pré-requisitos: `gh` instalado e logado (`brew install gh && gh auth login`) e o
-ffmpeg.
+O passo a passo completo (preparar o Mac, sincronizar com o original, testar,
+publicar e conferir), os problemas comuns e as métricas estão em
+[PUBLICAR.md](PUBLICAR.md).
 
 ## Avisos
 

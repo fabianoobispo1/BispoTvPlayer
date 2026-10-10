@@ -146,7 +146,7 @@ final class Atualizacao: ObservableObject {
         else { return nil }
         let tag = final.lastPathComponent
         guard let numero = Self.numeroDaTag(tag),
-              let dmg = URL(string: "https://github.com/\(repo)/releases/download/\(tag)/SaimoTV.dmg")
+              let dmg = URL(string: "https://github.com/\(repo)/releases/download/\(tag)/BispoTv.dmg")
         else { return nil }
         return Versao(tag: tag, numero: numero, notas: "", dmg: dmg)
     }

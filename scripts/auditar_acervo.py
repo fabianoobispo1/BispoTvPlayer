@@ -70,7 +70,7 @@ def start():
     for p in ROOT.glob('*.py'):shutil.copy2(p,work/p.name)
     shutil.copytree(ROOT/'vod',work/'vod')
     cache=work/'arquivos-gerados/redeflix';cache.mkdir(parents=True)
-    candidates=[ROOT/'arquivos-gerados/redeflix/cache.sqlite3',Path('/Users/gabrielespindola/Library/Application Support/SaimoTV/SaimoPlayer/arquivos-gerados/redeflix/cache.sqlite3')]
+    candidates=[ROOT/'arquivos-gerados/redeflix/cache.sqlite3',Path('/Users/gabrielespindola/Library/Application Support/BispoTv/BispoTvPlayer/arquivos-gerados/redeflix/cache.sqlite3')]
     available=[p for p in candidates if p.exists()]
     if available:
         source=max(available,key=lambda p:p.stat().st_mtime)

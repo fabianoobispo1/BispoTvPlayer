@@ -97,7 +97,7 @@ func roundedFont(_ pointSize: CGFloat, weight: NSFont.Weight) -> NSFont {
     return base
 }
 
-let title = NSAttributedString(string: "Saimo", attributes: [
+let title = NSAttributedString(string: "Bispo", attributes: [
     .font: roundedFont(196, weight: .bold),
     .foregroundColor: navy,
 ])

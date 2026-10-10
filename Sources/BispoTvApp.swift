@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @main
-struct SaimoApp: App {
+struct BispoTvApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ObservedObject private var model = PlayerModel.shared
 
@@ -30,7 +30,7 @@ struct SaimoApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Saimo TV") {
+        WindowGroup("BispoTv") {
             ContentView()
         }
         .windowStyle(.hiddenTitleBar)

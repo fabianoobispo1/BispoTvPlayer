@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolvedores neutros para fontes VOD adicionais do Saimo.
+"""Resolvedores neutros para fontes VOD adicionais do BispoTv.
 
 Não executa JavaScript e não depende do Kodi. Todas as consultas usam IDs
 exatos (IMDb/TMDB), limitam resposta/tempo e recusam endereços locais.

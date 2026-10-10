@@ -76,7 +76,10 @@ final class EventsService: ObservableObject {
                 return finalFim > now
             }
         } catch {
-            self.error = error.localizedDescription
+            // O motivo técnico vai para o log; na tela, só o que a pessoa
+            // precisa saber.
+            Log.shared.write("eventos: \(error.localizedDescription)")
+            self.error = "Eventos indisponíveis no momento."
         }
     }
 }
@@ -102,8 +105,17 @@ struct EventsView: View {
             } else if let error = service.error {
                 VStack {
                     Spacer()
-                    Text("Erro: \(error)")
-                        .foregroundStyle(.red)
+                    Image(systemName: "calendar.badge.exclamationmark")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 6)
+                    Text(error)
+                        .font(.headline)
+                    Text("O serviço de eventos não respondeu. Os canais continuam funcionando normalmente.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 360)
                     Button("Tentar Novamente") {
                         Task { await service.loadEvents() }
                     }

@@ -1,6 +1,6 @@
 import Foundation
 
-let url = URL(string: "https://github.com/gabrielsaimo/SaimoPlayer/releases/download/v1.1/SaimoTV.dmg")!
+let url = URL(string: "https://github.com/gabrielsaimo/SaimoPlayer/releases/download/v1.1/BispoTv.dmg")!
 let group = DispatchGroup()
 group.enter()
 

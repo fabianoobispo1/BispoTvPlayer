@@ -11,7 +11,7 @@ let oldBaixar = """
                           userInfo: [NSLocalizedDescriptionKey: "download recusado"])
         }
         let destino = FileManager.default.temporaryDirectory
-            .appendingPathComponent("SaimoTV-\\(UUID().uuidString).dmg")
+            .appendingPathComponent("BispoTv-\\(UUID().uuidString).dmg")
         try? FileManager.default.removeItem(at: destino)
         try FileManager.default.moveItem(at: fonte, to: destino)
         progresso = 1
@@ -28,7 +28,7 @@ let newBaixar = """
         }
         
         let destino = FileManager.default.temporaryDirectory
-            .appendingPathComponent("SaimoTV-\\(UUID().uuidString).dmg")
+            .appendingPathComponent("BispoTv-\\(UUID().uuidString).dmg")
         FileManager.default.createFile(atPath: destino.path, contents: nil, attributes: nil)
         let fileHandle = try FileHandle(forWritingTo: destino)
         defer { try? fileHandle.close() }

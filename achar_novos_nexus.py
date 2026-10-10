@@ -4,7 +4,7 @@ from pathlib import Path
 # 1. Carregar IDs do catálogo atual do SaimoPlayer
 saimo_ids = set()
 try:
-    with open("/Volumes/SSD 1TB/DEV/Saimo/SaimoPlayer/vod/fichas.txt", "r", encoding="utf-8") as f:
+    with open("/Volumes/Case/projetos/bispotv/BispoTvPlayer/vod/fichas.txt", "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split("\t")
             if len(parts) >= 3:
@@ -32,7 +32,7 @@ except Exception as e:
 
 # 3. Salvar os novos IDs em um arquivo para usar depois
 novos_ids = [str(m.get("id") or m.get("tmdb")) for m in novos_filmes]
-with open("/Volumes/SSD 1TB/DEV/Saimo/SaimoPlayer/arquivos-gerados/nexus/ids_novos_para_adicionar.txt", "w", encoding="utf-8") as f:
+with open("/Volumes/Case/projetos/bispotv/BispoTvPlayer/arquivos-gerados/nexus/ids_novos_para_adicionar.txt", "w", encoding="utf-8") as f:
     for nid in novos_ids:
         f.write(nid + "\n")
 

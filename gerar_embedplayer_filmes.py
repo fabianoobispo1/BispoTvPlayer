@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gera fontes HLS do Embedplayer para todos os filmes do catálogo Saimo.
+"""Gera fontes HLS do Embedplayer para todos os filmes do catálogo BispoTv.
 
 O catálogo VOD não guarda IMDb, mas cada fonte Xtream possui um stream_id. Este
 programa nunca tenta identificar um filme pelo nome. A cadeia é sempre:

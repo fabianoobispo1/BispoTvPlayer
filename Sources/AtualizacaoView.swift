@@ -35,7 +35,7 @@ struct AtualizacaoView: View {
                 .frame(maxHeight: 160)
             }
 
-            Text("O download abre no navegador. Depois é só abrir o DMG e arrastar o Saimo TV para Aplicativos, substituindo o antigo.")
+            Text("O download abre no navegador. Depois é só abrir o DMG e arrastar o BispoTv para Aplicativos, substituindo o antigo.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

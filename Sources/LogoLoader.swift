@@ -13,7 +13,7 @@ final class LogoLoader: ObservableObject {
 
     private let cacheDir: URL = {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("dev.saimo.player/logos", isDirectory: true)
+            .appendingPathComponent("dev.bispotv.player/logos", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }()

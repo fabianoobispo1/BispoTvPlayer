@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from collections import defaultdict
 
-VOD_DIR = Path("/Volumes/SSD 1TB/DEV/Saimo/SaimoPlayer/vod")
+VOD_DIR = Path("/Volumes/Case/projetos/bispotv/BispoTvPlayer/vod")
 
 def normalize(title: str) -> str:
     import unicodedata

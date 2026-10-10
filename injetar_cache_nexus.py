@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 from atualizar_nexus import append_nexus, load_vod_files, build_title_index, parse_vod_sources, build_vod_line, normalize, extract_year
 
-db_path = Path("/Volumes/SSD 1TB/DEV/Saimo/SaimoPlayer/arquivos-gerados/nexus/cache.sqlite3")
+db_path = Path("/Volumes/Case/projetos/bispotv/BispoTvPlayer/arquivos-gerados/nexus/cache.sqlite3")
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 cur.execute("SELECT tmdb, url FROM nexus_urls WHERE url != ''")
@@ -40,7 +40,7 @@ for movie in movies:
 
 if changes > 0:
     for fname, lines in vod_files.items():
-        with open(Path("/Volumes/SSD 1TB/DEV/Saimo/SaimoPlayer/vod") / fname, "w") as f:
+        with open(Path("/Volumes/Case/projetos/bispotv/BispoTvPlayer/vod") / fname, "w") as f:
             f.write("\n".join(l[1] for l in lines) + "\n")
 
 print(f"Aplicadas {changes} fontes do cache.")

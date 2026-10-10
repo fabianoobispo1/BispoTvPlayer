@@ -12,20 +12,20 @@
 #   ./scripts/agendar_atualizacao.sh --ver      diz se está ligado e quando rodou
 #
 # Quem roda às 5h é uma cópia do repositório no disco interno, em
-# ~/Library/Application Support/SaimoTV/SaimoPlayer, e não esta aqui. O macOS
+# ~/Library/Application Support/BispoTv/BispoTvPlayer, e não esta aqui. O macOS
 # não deixa processo de fundo ler arquivo em disco externo ("Operation not
 # permitted"), e por isso nenhuma rodada das 5h aconteceu de fato até 21/09 —
 # todas as linhas do registro eram de rodadas manuais. A cópia é criada e
 # recebe os caches daqui na primeira vez; depois ela mesma se atualiza pelo
 # git antes de cada rodada.
 #
-# Para acompanhar: tail -f ~/Library/Application\ Support/SaimoTV/SaimoPlayer/arquivos-gerados/atualizacao.log
+# Para acompanhar: tail -f ~/Library/Application\ Support/BispoTv/BispoTvPlayer/arquivos-gerados/atualizacao.log
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ORIGEM="$(pwd)"
-RAIZ="$HOME/Library/Application Support/SaimoTV/SaimoPlayer"
+RAIZ="$HOME/Library/Application Support/BispoTv/BispoTvPlayer"
 
-ETIQUETA="dev.saimo.atualizar-catalogo"
+ETIQUETA="dev.bispotv.atualizar-catalogo"
 PLIST="$HOME/Library/LaunchAgents/$ETIQUETA.plist"
 HORA=5
 MINUTO=0
@@ -57,7 +57,7 @@ case "${1:-}" in
   *) echo "opção desconhecida: $1" >&2; exit 2 ;;
 esac
 
-mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/SaimoTV"
+mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/BispoTv"
 
 if [ ! -d "$RAIZ/.git" ]; then
   echo "criando a cópia de trabalho em $RAIZ"
@@ -123,9 +123,9 @@ cat > "$PLIST" <<PLISTA
     <string>$CHAVE_TMDB</string>
   </dict>
   <key>StandardOutPath</key>
-  <string>$HOME/Library/Logs/SaimoTV/launchd.log</string>
+  <string>$HOME/Library/Logs/BispoTv/launchd.log</string>
   <key>StandardErrorPath</key>
-  <string>$HOME/Library/Logs/SaimoTV/launchd.log</string>
+  <string>$HOME/Library/Logs/BispoTv/launchd.log</string>
   <key>RunAtLoad</key>
   <false/>
 </dict>

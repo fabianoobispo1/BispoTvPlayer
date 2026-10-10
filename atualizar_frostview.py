@@ -23,7 +23,7 @@ BASE = 'https://frostview.cloutteam.com'
 def fetch(path):
     for attempt in range(3):
         try:
-            request = urllib.request.Request(BASE + path, headers={'User-Agent': 'SaimoTV-Catalog/1.0'})
+            request = urllib.request.Request(BASE + path, headers={'User-Agent': 'BispoTv-Catalog/1.0'})
             with urllib.request.urlopen(request, timeout=30) as response:
                 return json.load(response)
         except Exception:

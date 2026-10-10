@@ -217,7 +217,7 @@ final class Upstream: @unchecked Sendable {
         // que é concorrente: dois pedaços da resposta podiam mexer no buffer
         // ao mesmo tempo. Uma fila serial própria, e tudo que ela junta mora
         // no coletor, que só ela toca até a conexão terminar.
-        let fila = DispatchQueue(label: "dev.saimo.upstream.direto")
+        let fila = DispatchQueue(label: "dev.bispotv.upstream.direto")
         let coleta = Coleta()
         let pedido = Data(head.utf8)
 

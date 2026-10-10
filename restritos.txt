@@ -1,4 +1,4 @@
-# SAIMO TV — CANAIS RESTRITOS
+# BISPOTV — CANAIS RESTRITOS
 # 72 canais · só aparecem depois do código
 #
 # Mesmo formato do catalogo.txt. Os apps baixam este arquivo ao destravar,

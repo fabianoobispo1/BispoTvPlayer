@@ -1,4 +1,4 @@
-# SAIMO TV — LISTA DE CANAIS
+# BISPOTV — LISTA DE CANAIS
 # 408 canais · 17/09/2026
 #
 # Os apps baixam este arquivo ao abrir, então trocar um link aqui basta: nada
@@ -21,7 +21,7 @@
 #
 # referer, agente e chave pertencem à fonte imediatamente acima delas.
 # Linhas em branco e linhas começadas por # são ignoradas.
-# SAIMO TV — LISTA DE CANAIS
+# BISPOTV — LISTA DE CANAIS
 # 408 canais · 17/09/2026
 #
 # Os apps baixam este arquivo ao abrir, então trocar um link aqui basta: nada
@@ -41,7 +41,7 @@
 #
 # referer, agente e chave pertencem à fonte imediatamente acima delas.
 # Linhas em branco e linhas começadas por # são ignoradas.
-# SAIMO TV — LISTA DE CANAIS
+# BISPOTV — LISTA DE CANAIS
 # 408 canais · 17/09/2026
 #
 # Os apps baixam este arquivo ao abrir, então trocar um link aqui basta: nada

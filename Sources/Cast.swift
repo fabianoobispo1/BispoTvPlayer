@@ -35,7 +35,7 @@ final class CastService: ObservableObject {
     private var heartbeat: Timer?
     private var pendingMedia: (url: URL, title: String)?
 
-    private let senderID = "sender-saimo"
+    private let senderID = "sender-bispotv"
     private let receiverID = "receiver-0"
     private let defaultReceiverApp = "CC1AD845"
 

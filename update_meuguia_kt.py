@@ -1,3 +1,4 @@
+# Ainda não usado: depende do app Android (../SaimoTV-Android), que não existe ainda.
 import re
 
 with open('../SaimoTV-Android/app/src/main/java/br/com/saimo/tv/MeuGuia.kt', 'r') as f:

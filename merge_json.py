@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Ainda não usado: depende do app Android (../SaimoTV-Android), que não existe ainda.
 """Põe as fontes do offline.json na frente, quando elas respondem.
 
 O arquivo é a lista de referência, então cada canal passa a tentar a fonte dele

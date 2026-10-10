@@ -21,7 +21,7 @@ OUT = ROOT / "catalogo.txt"
 
 STRING = r'(?:nil|"(?:[^"\\]|\\.)*")'
 
-CABECALHO = """# SAIMO TV — LISTA DE CANAIS
+CABECALHO = """# BISPOTV — LISTA DE CANAIS
 # {contagem} canais · {data}
 #
 # Os apps baixam este arquivo ao abrir, então trocar um link aqui basta: nada

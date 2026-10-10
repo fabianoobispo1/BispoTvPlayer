@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent
 OUT = ROOT / 'arquivos-gerados/resolucoes-local'
 FILES = [ROOT / 'catalogo.txt', ROOT / 'restritos.txt']
 UA = 'Mozilla/5.0'
-PROBE = '/Applications/Saimo TV.app/Contents/Resources/ffprobe'
+PROBE = '/Applications/BispoTv.app/Contents/Resources/ffprobe'
 
 
 def atomic(path, value):

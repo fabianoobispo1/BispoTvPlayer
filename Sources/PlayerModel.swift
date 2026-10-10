@@ -1206,7 +1206,7 @@ final class PlayerModel: NSObject, ObservableObject {
     /// Exports every generated link as an .m3u playlist for other players.
     func exportPlaylist() {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "saimo.m3u"
+        panel.nameFieldStringValue = "bispotv.m3u"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         var out = "#EXTM3U\n"
         for c in channels {
@@ -1265,7 +1265,7 @@ final class PlayerModel: NSObject, ObservableObject {
     private func updateNowPlaying(channel: Channel) {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
             MPMediaItemPropertyTitle: channel.name,
-            MPMediaItemPropertyArtist: "Saimo TV",
+            MPMediaItemPropertyArtist: "BispoTv",
             MPNowPlayingInfoPropertyIsLiveStream: true,
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
         ]

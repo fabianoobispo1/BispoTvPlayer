@@ -12,6 +12,6 @@ for r in data:
         if name and url:
             lines.append(f"{name}|{url}")
 
-with open("/Volumes/SSD 1TB/DEV/Saimo/SaimoPlayer/vod/radios.txt", "w", encoding="utf-8") as f:
+with open("/Volumes/Case/projetos/bispotv/BispoTvPlayer/vod/radios.txt", "w", encoding="utf-8") as f:
     for line in lines:
         f.write(line + "\n")

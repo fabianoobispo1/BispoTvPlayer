@@ -130,7 +130,7 @@ final class EPGService: ObservableObject {
 
     private var cacheFile: URL {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("dev.saimo.player", isDirectory: true)
+            .appendingPathComponent("dev.bispotv.player", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("epg.json.z")
     }

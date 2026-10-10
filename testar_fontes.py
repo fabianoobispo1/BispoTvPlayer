@@ -169,7 +169,7 @@ def main():
             ok.append(nome)
 
     texto = [
-        "SAIMO TV — FONTES QUE NÃO RESPONDEM",
+        "BISPOTV — FONTES QUE NÃO RESPONDEM",
         f"{len(canais)} canais · {len(tarefas)} fontes testadas",
         "",
         "Alcançável não é o mesmo que tocável: uma fonte DASH pode responder e",

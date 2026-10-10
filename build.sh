@@ -2,7 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-APP="build/Saimo TV.app"
+APP="build/BispoTv.app"
 
 # Sem o Xcode, o SDK do macOS 27 das Command Line Tools não tem o plugin das
 # macros do SwiftUI (@State). O SDK 26.5 compila sem ele.
@@ -28,9 +28,9 @@ swiftc \
   -framework AVFoundation \
   -framework SwiftUI \
   -framework AppKit \
-  -o "$APP/Contents/MacOS/SaimoTV" \
+  -o "$APP/Contents/MacOS/BispoTv" \
   Sources/*.swift
 
-codesign --force --sign - --identifier dev.saimo.player "$APP" >/dev/null 2>&1 || true
+codesign --force --sign - --identifier dev.bispotv.player "$APP" >/dev/null 2>&1 || true
 
 echo "built: $APP"

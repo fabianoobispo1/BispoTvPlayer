@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Saimo TV</string>
+	<string>BispoTv</string>
 	<key>CFBundleExecutable</key>
-	<string>SaimoTV</string>
+	<string>BispoTv</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.saimo.player</string>
+	<string>dev.bispotv.player</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Saimo TV</string>
+	<string>BispoTv</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

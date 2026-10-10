@@ -82,7 +82,7 @@ SEM_CONFERIR.check_hostname = False
 SEM_CONFERIR.verify_mode = ssl.CERT_NONE
 ABRIDOR = urllib.request.build_opener(urllib.request.HTTPSHandler(context=SEM_CONFERIR))
 FFPROBE = next((p for p in (shutil.which("ffprobe"),
-                            "/Applications/Saimo TV.app/Contents/Resources/ffprobe")
+                            "/Applications/BispoTv.app/Contents/Resources/ffprobe")
                 if p and os.path.exists(p)), None)
 FFPROBE_VAGAS = threading.BoundedSemaphore(12)
 TELA = threading.Lock()

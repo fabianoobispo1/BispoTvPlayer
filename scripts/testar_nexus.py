@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'arquivos-gerados/nexus'
 BASE = 'https://nexustvplay.bbroot.com/api/stream/'
-PROBE = '/Applications/Saimo TV.app/Contents/Resources/ffprobe'
+PROBE = '/Applications/BispoTv.app/Contents/Resources/ffprobe'
 
 def get(url, limit=262144):
     with urlopen(Request(url, headers={'User-Agent': 'Mozilla/5.0'}), timeout=12) as r:

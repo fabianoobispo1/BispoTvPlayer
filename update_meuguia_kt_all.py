@@ -1,3 +1,4 @@
+# Ainda não usado: depende do app Android (../SaimoTV-Android), que não existe ainda.
 import re
 
 new_codes = {

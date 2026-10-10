@@ -194,7 +194,7 @@ def sync_lists() -> tuple[list[str], dict[str, list[dict]], dict[str, set[str]],
     
     # Injetando os IDs achados na NexusTV
     try:
-        with open("/Volumes/SSD 1TB/DEV/Saimo/SaimoPlayer/arquivos-gerados/nexus/ids_novos_para_adicionar.txt", "r") as f:
+        with open("/Volumes/Case/projetos/bispotv/BispoTvPlayer/arquivos-gerados/nexus/ids_novos_para_adicionar.txt", "r") as f:
             extra_ids = [line.strip() for line in f if line.strip()]
         movie_ids = unique_ids(movie_ids + extra_ids)
         print(f"-> Injetados {len(extra_ids)} IDs inéditos (via NexusTV) para o RedeFlix processar!")

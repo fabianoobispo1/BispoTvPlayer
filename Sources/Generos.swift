@@ -148,7 +148,7 @@ enum Generos {
 
     private static var arquivo: URL {
         let pasta = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SaimoTV", isDirectory: true)
+            .appendingPathComponent("BispoTv", isDirectory: true)
         try? FileManager.default.createDirectory(at: pasta, withIntermediateDirectories: true)
         return pasta.appendingPathComponent("fichas.txt")
     }

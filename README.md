@@ -93,7 +93,10 @@ no último canal assistido.
 
 ## Dados publicados
 
-O app baixa daqui (via raw do GitHub):
+O app baixa daqui (via raw do GitHub) a lista de canais ao vivo. O acervo de
+filmes e séries (`vod/`) vem do repositório original,
+[gabrielsaimo/SaimoPlayer](https://github.com/gabrielsaimo/SaimoPlayer/tree/main/vod);
+a pasta `vod/` daqui é só uma cópia antiga, que o app não lê.
 
 - `catalogo.txt` — a lista de canais, com fontes em ordem de preferência. Cada
   fonte pode ter um `nome:` ("Temporada 3", "Legendado") que o app mostra no

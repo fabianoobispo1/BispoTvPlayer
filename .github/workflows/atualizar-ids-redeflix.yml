@@ -5,9 +5,10 @@ name: Atualizar catálogo
 # acabou de gravar em vod/redeflix. Rodar só a segunda mostraria as novidades
 # de ontem.
 on:
-  schedule:
-    # Todo dia às 11h17 em Brasília (14h17 UTC), junto da rodada do Mac às 11h.
-    - cron: "17 14 * * *"
+  # Desligado: o app lê o acervo do repositório original (gabrielsaimo/SaimoPlayer).
+  # schedule:
+  #   # Todo dia às 11h17 em Brasília (14h17 UTC), junto da rodada do Mac às 11h.
+  #   - cron: "17 14 * * *"
   workflow_dispatch:
 
 permissions:

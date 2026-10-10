@@ -35,8 +35,11 @@ struct Episodio: Identifiable, Hashable {
 /// o download acompanha o clique em vez de contrariá-lo.
 enum Vod {
 
+    /// O acervo (filmes, séries, fichas, destaques e legendas) vem do
+    /// repositório original do Saimo TV, que o mantém atualizado. Os canais ao
+    /// vivo continuam vindo deste repositório (RemoteCatalog).
     private static let base =
-        "https://raw.githubusercontent.com/fabianoobispo1/BispoTvPlayer/main/vod/"
+        "https://raw.githubusercontent.com/gabrielsaimo/SaimoPlayer/main/vod/"
 
     struct Gaveta: Identifiable, Hashable {
         var letra: String

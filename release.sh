@@ -114,8 +114,12 @@ fi
 echo "==> enviando para o GitHub"
 git push -q origin HEAD
 
-echo "==> publicando v$versao"
-gh release create "v$versao" \
+# Com o remote "upstream" (o original, do sincronizar_original.sh) o gh não
+# sabe sozinho em qual repositório publicar: é sempre no origin.
+repo="$(git remote get-url origin | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##')"
+
+echo "==> publicando v$versao em $repo"
+gh release create "v$versao" --repo "$repo" \
   --target "$(git rev-parse HEAD)" \
   --title "BispoTv $versao" \
   --notes-file "$notas" \
@@ -124,4 +128,4 @@ gh release create "v$versao" \
   # Quando existirem os outros apps:
   # $(ls build/release/*.apk build/release/*.zip 2>/dev/null)
 
-echo "pronto: https://github.com/fabianoobispo1/BispoTvPlayer/releases/tag/v$versao"
+echo "pronto: https://github.com/$repo/releases/tag/v$versao"

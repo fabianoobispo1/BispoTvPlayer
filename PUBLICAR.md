@@ -88,6 +88,7 @@ Para ele funcionar:
 | `aviso: sem chave do TMDB` | Falta `arquivos-gerados/tmdb-chave.txt`. O app compila, mas sem capas e fichas. |
 | `ffmpeg não encontrado — DMG sairá sem suporte a DASH/HEVC` | `brew install ffmpeg`. |
 | `gh: command not found` ou `not logged in` | `brew install gh && gh auth login`. |
+| `No default remote repository has been set` | Versões antigas do `release.sh` não diziam ao `gh` qual repositório usar (há dois remotes: `origin` e `upstream`). O script atual já passa `--repo`; se precisar, rode `gh repo set-default fabianoobispo1/BispoTvPlayer`. |
 | `release ... already exists` | Essa versão já foi publicada. Use um número novo. |
 | Quem baixa vê "não é possível verificar o desenvolvedor" | Normal: o app não é assinado pela Apple. As notas do release explicam o "Abrir Mesmo Assim". Para sumir com o aviso, é preciso a conta de desenvolvedor da Apple (assinatura + notarização). |
 

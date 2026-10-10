@@ -1,0 +1,662 @@
+#!/usr/bin/env python3
+"""Junta as listas de origem num catálogo de filmes e séries que cabe numa TV.
+
+As listas somam 60 MB e 590 mil linhas, e não trazem atributo nenhum: nem capa,
+nem gênero, nem grupo. Só nome e URL. Tudo o que dá para saber vem do nome:
+
+    "Nome S01E02"  -> episódio de série
+    "Nome [L]"     -> versão legendada do mesmo título
+    "[Adulto]"     -> vai para a parte reservada, não para a lista comum
+    resto          -> filme
+
+O mesmo filme costuma existir nas duas listas. Fontes do mesmo título, ano e
+idioma ficam juntas, mas refilmagens nunca podem ser confundidas: "Mestres do
+Universo (1987)" e "Mestres do Universo (2026)" são dois itens. Quando há mais
+de uma fonte, os apps deixam a pessoa escolher qual quer abrir.
+
+Os canais de TV das listas são ignorados: esta parte é só filme e série.
+
+O resultado sai fatiado por letra, e as séries ainda em pedaços dentro da letra,
+porque nenhum TV Box abre um arquivo de 20 MB. As URLs encolhem junto: o que se
+repete é o começo, então cada base mora uma vez no índice e o item guarda só o
+número.
+"""
+import re
+import unicodedata
+from collections import defaultdict
+from pathlib import Path
+from urllib.request import urlopen
+
+ORIGENS = [
+    "https://raw.githubusercontent.com/Ramys/Iptv-Brasil-2026/refs/heads/master/CanaisBR01.m3u8",
+    "https://raw.githubusercontent.com/Ramys/Iptv-Brasil-2026/refs/heads/master/CanaisBR02.m3u8",
+    "https://raw.githubusercontent.com/Ramys/Iptv-Brasil-2026/refs/heads/master/Filmes-Series.m3u8",
+    # Lista guardada neste repositório. Fica por último para os servidores dela
+    # entrarem depois dos que já têm número no índice.
+    "https://raw.githubusercontent.com/fabianoobispo1/BispoTvPlayer/refs/heads/main/3.m3u",
+    "https://raw.githubusercontent.com/fabianoobispo1/BispoTvPlayer/refs/heads/main/1.m3u",
+]
+# Servidores fora do ar para todos, sem publicar app: os links deles não entram
+# no catálogo. Para voltar, tire daqui e rode o script de novo.
+DESATIVADOS = ["up.kiwi", "hubby.cx"]
+# Servidores das fontes resolvidas por id (Redeflix). São as únicas que o
+# acervo publicado guarda e as listas M3U não trazem de volta, então são as
+# únicas preservadas de uma montagem para a outra. Endereço inteiro de outro
+# servidor vem de lista M3U e vive ou morre com ela — preservá-lo manteria
+# link morto no acervo para sempre.
+RESOLVIDOS_POR_ID = ("embedplayer",)
+ROOT = Path(__file__).resolve().parent
+SAIDA = ROOT / "vod"
+# Fontes que o teste (testar_fontes_vod.py) confirmou mortas, uma URL inteira
+# por linha. O acervo é remontado todo dia guardando os links antigos; sem esta
+# lista uma fonte morta voltaria em toda rodada.
+MORTAS = ROOT / "fontes-mortas.txt"
+
+# A segunda lista escreve "S01 E01", com espaço antes do E; a primeira escreve
+# "S01E01", colado. O \s* aceita as duas sem precisar de um regex por origem.
+EPISODIO = re.compile(r"^(.*?)\s*S(\d{1,2})\s*E(\d{1,3})\s*$", re.I)
+MARCADOR = re.compile(r"\s*[\[\(]([^\]\)]{1,24})[\]\)]")
+ANO_FIM = re.compile(r"\s*(?:\(((?:19|20)\d{2})\)|((?:19|20)\d{2}))\s*$")
+ADULTO = {"adulto", "xxx", "+18", "18+"}
+QUALIDADE = re.compile(r"\s*\b(4k|uhd|fhd|hd|sd|h265|hevc|hdr|dv)\b\s*²?", re.I)
+POR_PEDACO = 120
+
+# Ordem de preferência. Quem não anuncia nada fica no meio: costuma ser 1080p,
+# melhor que um "HD" declarado, que na prática é 720p.
+ORDEM_QUALIDADE = {"4k": 0, "uhd": 0, "hdr": 1, "fhd": 1, "": 2,
+                   "h265": 2, "hevc": 2, "dv": 2, "hd": 3, "sd": 4}
+
+
+def nome_do_extinf(linha):
+    """O nome que vem depois dos atributos do `#EXTINF`.
+
+    A segunda lista traz `tvg-name`, `tvg-logo` e `group-title`, e o valor de
+    um deles às vezes tem vírgula dentro das aspas — "De Repente, Miss!". Cortar
+    na primeira vírgula da linha partia o atributo ao meio e o título virava
+    `Miss!" tvg-logo="http://…`, sem capa e fora de ordem no alfabeto. A vírgula
+    que separa o nome é a primeira que estiver fora das aspas.
+    """
+    dentro = False
+    for posicao, caractere in enumerate(linha):
+        if caractere == '"':
+            dentro = not dentro
+        elif caractere == "," and not dentro:
+            return linha[posicao + 1:].strip()
+    return ""
+
+
+def letra(titulo):
+    texto = unicodedata.normalize("NFKD", titulo).encode("ascii", "ignore").decode()
+    inicial = texto.strip()[:1].upper()
+    return inicial if "A" <= inicial <= "Z" else "#"
+
+
+def limpar(nome):
+    """Devolve (título, legendado, adulto, qualidade). Marcador é versão."""
+    ano_final = ANO_FIM.search(nome)
+    ano = (ano_final.group(1) or ano_final.group(2)) if ano_final else ""
+    marcadores = [m.strip().lower() for m in MARCADOR.findall(nome)]
+    legendado = any(m == "l" for m in marcadores)
+    adulto = any(m in ADULTO for m in marcadores)
+    titulo = MARCADOR.sub(" ", nome)
+    # "1917 4K" e "1917" são o mesmo filme: a qualidade já sai da chave que
+    # junta as fontes, e sair também do nome evita o cartão chamado "4K".
+    titulo = QUALIDADE.sub(" ", titulo)
+    titulo = titulo.replace("²", " ")
+    titulo = re.sub(r"\s{2,}", " ", titulo).strip()
+    # O parser de marcadores também encontra "(1987)". Recolocar o ano evita
+    # que duas refilmagens voltem a cair na mesma chave depois da limpeza.
+    if ano and not ANO_FIM.search(titulo):
+        titulo = f"{titulo} ({ano})"
+    achada = QUALIDADE.search(nome)
+    qualidade = achada.group(1).lower() if achada else ""
+    return titulo, legendado, adulto, qualidade
+
+
+def separar_ano(titulo):
+    """Devolve título sem ano e o ano final, entre parênteses ou solto."""
+    achado = ANO_FIM.search(titulo)
+    if not achado:
+        return titulo, ""
+    sem_ano = ANO_FIM.sub("", titulo).strip()
+    # Ano solto vem antecedido de um separador — "Nome - 2014" — que a busca
+    # do ano não apaga por não fazer parte dele. Sobrando, o mesmo filme das
+    # duas listas vira "Nome" numa e "Nome -" na outra: chaves diferentes,
+    # duas entradas em vez de duas fontes do mesmo título.
+    sem_ano = re.sub(r"[\s\-–—:|]+$", "", sem_ano).strip()
+    # "2012" também é título de filme. Nunca o transforme num nome vazio.
+    if not sem_ano:
+        return titulo, ""
+    return sem_ano, achado.group(1) or achado.group(2)
+
+
+def chave(titulo, ano=""):
+    """Nome comparável entre listas, preservando o ano que separa refilmagens."""
+    texto = QUALIDADE.sub(" ", titulo)
+    texto = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode().lower()
+    base = re.sub(r"[^a-z0-9]+", " ", texto).strip()
+    return f"{base}|{ano}" if ano else base
+
+
+class Bases:
+    """Começos de URL que se repetem, para o item guardar só o número."""
+
+    def __init__(self, anteriores=()):
+        # Os números já publicados continuam valendo: cada fatia guarda o número
+        # da base, e renumerar faria todo app baixar o acervo de novo à toa.
+        self.lista = list(anteriores)
+
+    def encurtar(self, url):
+        for indice, base in enumerate(self.lista):
+            if url.startswith(base):
+                resto = url[len(base):]
+                resto = resto[:-4] if resto.endswith(".mp4") else resto
+                return f"{indice}:{resto}"
+        corte = url.rfind("/") + 1
+        base = url[:corte]
+        if corte > 10 and len(self.lista) < 12:
+            self.lista.append(base)
+            return self.encurtar(url)
+        return url
+
+
+def expandir(fonte, bases):
+    """A URL inteira de uma fonte como o acervo guarda ("2:108242" ou a URL)."""
+    if ":" in fonte and fonte.split(":", 1)[0].isdigit():
+        indice, resto = fonte.split(":", 1)
+        indice = int(indice)
+        if indice < len(bases.lista):
+            sufixo = "" if "." in resto.rsplit("/", 1)[-1] else ".mp4"
+            return bases.lista[indice] + resto + sufixo
+    return fonte
+
+
+def fontes_mortas():
+    """URLs mortas e servidores inteiros fora do ar ("servidor: host")."""
+    if not MORTAS.exists():
+        return set()
+    return {l.strip() for l in MORTAS.read_text(encoding="utf-8").splitlines()
+            if l.strip() and not l.startswith("#")}
+
+
+def _servidor(url):
+    return url.split("://", 1)[-1].split("/", 1)[0].split(":", 1)[0].lower()
+
+
+def tirar_mortas(filmes, series, reservado, bases, mortas):
+    """Tira as fontes mortas; título sem fonte que sobre sai. Devolve quantos saíram."""
+    servidores = {m.split(":", 1)[1].strip().lower() for m in mortas if m.startswith("servidor:")}
+
+    def morta(fonte):
+        url = expandir(fonte, bases)
+        return url in mortas or (servidores and _servidor(url) in servidores)
+
+    def vivas(lista):
+        return [f for f in lista if not morta(f)]
+
+    tirados_f = 0
+    for colecao in (filmes, reservado):
+        for chave in list(colecao):
+            versoes = colecao[chave]["versoes"]
+            for v in list(versoes):
+                versoes[v] = vivas(versoes[v])
+                if not versoes[v]:
+                    del versoes[v]
+            if not versoes:
+                del colecao[chave]
+                tirados_f += 1
+    tirados_s = 0
+    for chave in list(series):
+        eps = series[chave]["eps"]
+        for ep in list(eps):
+            eps[ep] = vivas(eps[ep])
+            if not eps[ep]:
+                del eps[ep]
+        if not eps:
+            del series[chave]
+            tirados_s += 1
+    return tirados_f, tirados_s
+
+
+def baixar(url):
+    print(f"baixando {url.rsplit('/', 1)[-1]}…")
+    with urlopen(url, timeout=180) as resposta:
+        return resposta.read().decode("utf-8", "replace")
+
+
+def bases_publicadas():
+    """As bases do índice atual, na ordem em que foram numeradas."""
+    indice = SAIDA / "indice.txt"
+    if not indice.exists():
+        return []
+    publicadas = []
+    for linha in indice.read_text(encoding="utf-8").splitlines():
+        if linha.startswith("base:"):
+            partes = linha[len("base:"):].strip().split(" ", 1)
+            if len(partes) == 2:
+                publicadas.append(partes[1])
+    return publicadas
+
+
+def resolvido_por_id(url):
+    if not url.startswith("http"):
+        return False
+    servidor = url.split("://", 1)[-1].split("/", 1)[0].lower()
+    return any(marca in servidor for marca in RESOLVIDOS_POR_ID)
+
+
+def links_diretos_de_filmes(caminhos, aceita=resolvido_por_id):
+    """Endereços inteiros ("https://...") de cada filme, em arquivos no formato
+    do acervo: "Título (ano)\tdub=url,url\tleg=url".
+
+    Só os inteiros interessam: os encurtados ("2:368180") vêm das listas M3U e
+    são refeitos a cada montagem. Os inteiros vêm do Redeflix e de resoluções
+    antigas por id, que nenhuma lista M3U traz de volta.
+    """
+    achados = defaultdict(lambda: {"titulo": "", "versoes": defaultdict(list)})
+    for caminho in caminhos:
+        if not caminho.exists():
+            continue
+        for linha in caminho.read_text(encoding="utf-8").splitlines():
+            campos = linha.split("\t")
+            if len(campos) < 2 or not campos[0]:
+                continue
+            diretos = defaultdict(list)
+            for campo in campos[1:]:
+                versao, _, urls = campo.partition("=")
+                if versao in ("dub", "leg"):
+                    diretos[versao] += [u for u in urls.split(",") if aceita(u)]
+            # Sem endereço inteiro não há o que preservar: o título vive ou
+            # morre pelas listas M3U, como sempre.
+            if not any(diretos.values()):
+                continue
+            titulo, ano = separar_ano(campos[0])
+            registro = achados[chave(titulo, ano)]
+            registro["titulo"] = registro["titulo"] or campos[0]
+            for versao, urls in diretos.items():
+                for url in urls:
+                    if url not in registro["versoes"][versao]:
+                        registro["versoes"][versao].append(url)
+    return achados
+
+
+def links_diretos_de_series(caminhos, aceita=resolvido_por_id):
+    """O mesmo para séries: "@Título\tano[\tid]" seguido de
+    "temporada\tepisódio\tversão\turl,url"."""
+    achados = defaultdict(lambda: {"titulo": "", "ano": "", "eps": defaultdict(list)})
+    for caminho in caminhos:
+        if not caminho.exists():
+            continue
+        registro = None
+        for linha in caminho.read_text(encoding="utf-8").splitlines():
+            if linha.startswith("@"):
+                campos = linha[1:].split("\t")
+                titulo = campos[0].strip()
+                ano = campos[1].strip() if len(campos) > 1 else ""
+                registro = (titulo, ano) if titulo else None
+                continue
+            if registro is None:
+                continue
+            campos = linha.split("\t")
+            if len(campos) < 4:
+                continue
+            try:
+                alvo = (int(campos[0]), int(campos[1]), campos[2] or "dub")
+            except ValueError:
+                continue
+            urls = [u for u in campos[3].split(",") if aceita(u)]
+            if not urls:
+                continue
+            # Só vira série quem tem ao menos um episódio com endereço inteiro.
+            titulo, ano = registro
+            serie = achados[chave(titulo, ano)]
+            serie["titulo"] = serie["titulo"] or titulo
+            serie["ano"] = serie["ano"] or ano
+            for url in urls:
+                if url not in serie["eps"][alvo]:
+                    serie["eps"][alvo].append(url)
+    return achados
+
+
+def main():
+    bases = Bases(bases_publicadas())
+    filmes = defaultdict(lambda: {"titulo": "", "versoes": defaultdict(list)})
+    series = defaultdict(lambda: {"titulo": "", "ano": "", "eps": defaultdict(list)})
+    reservado = defaultdict(lambda: {"titulo": "", "versoes": defaultdict(list)})
+    # Fonte -> qualidade anunciada no nome. Só as que anunciam entram, então o
+    # arquivo fica pequeno o bastante para o app baixar inteiro de uma vez.
+    marcas = {}
+    ignorados = 0
+
+    for origem in ORIGENS:
+        linhas = baixar(origem).split("\n")
+        indice = 0
+        while indice < len(linhas) - 1:
+            linha = linhas[indice]
+            if not linha.startswith("#EXTINF"):
+                indice += 1
+                continue
+            nome = nome_do_extinf(linha)
+            url = linhas[indice + 1].strip()
+            indice += 2
+            if not url or url.startswith("#"):
+                continue
+            if any(host in url for host in DESATIVADOS):
+                ignorados += 1
+                continue
+            # Canal de TV ao vivo: não é o assunto desta lista. Na primeira ele
+            # termina em .ts; na segunda vem sem extensão nenhuma.
+            if url.endswith(".ts") or "." not in url.rsplit("/", 1)[-1]:
+                ignorados += 1
+                continue
+
+            titulo, legendado, adulto, qualidade = limpar(nome)
+            if not titulo:
+                continue
+            versao = "leg" if legendado else "dub"
+            curta = bases.encurtar(url)
+            if qualidade:
+                marcas[curta] = qualidade
+
+            episodio = EPISODIO.match(titulo)
+            if episodio:
+                if adulto:
+                    continue
+                serie = episodio.group(1).strip()
+                serie, ano = separar_ano(serie)
+                if not serie:
+                    continue
+                registro = series[chave(serie, ano)]
+                registro["titulo"] = registro["titulo"] or serie
+                registro["ano"] = registro["ano"] or ano
+                alvo = (int(episodio.group(2)), int(episodio.group(3)), versao)
+                if curta not in registro["eps"][alvo]:
+                    registro["eps"][alvo].append(curta)
+            else:
+                destino = reservado if adulto else filmes
+                titulo, ano = separar_ano(titulo)
+                exibido = f"{titulo} ({ano})" if ano else titulo
+                registro = destino[chave(titulo, ano)]
+                registro["titulo"] = registro["titulo"] or exibido
+                if curta not in registro["versoes"][versao]:
+                    registro["versoes"][versao].append(curta)
+
+    # A melhor primeiro: é a que todo app abre sem perguntar nada.
+    def por_qualidade(curta):
+        return ORDEM_QUALIDADE.get(marcas.get(curta, ""), 2)
+
+    for colecao in (filmes, reservado):
+        for registro in colecao.values():
+            for versao, lista in registro["versoes"].items():
+                registro["versoes"][versao] = sorted(lista, key=por_qualidade)
+    for registro in series.values():
+        for alvo, lista in registro["eps"].items():
+            registro["eps"][alvo] = sorted(lista, key=por_qualidade)
+
+    # Links diretos: os que o acervo publicado já tinha e os que o Redeflix
+    # resolveu. Sem isto, remontar o acervo pelas listas M3U apagaria as fontes
+    # que vieram por id — e os títulos que só o Redeflix tem nunca entrariam.
+    # Lidos antes da limpeza logo abaixo, que apaga os arquivos de onde vêm.
+    # Entram na frente: é a fonte resolvida por id, a que costuma abrir.
+    redeflix = SAIDA / "redeflix"
+    novos_filmes = novas_series = 0
+
+    def somar_filme(k, direto):
+        registro = filmes[k]
+        registro["titulo"] = registro["titulo"] or direto["titulo"]
+        for versao, urls in direto["versoes"].items():
+            antigas = [u for u in registro["versoes"][versao] if u not in urls]
+            registro["versoes"][versao] = urls + antigas
+
+    def somar_serie(k, direto):
+        registro = series[k]
+        registro["titulo"] = registro["titulo"] or direto["titulo"]
+        registro["ano"] = registro["ano"] or direto["ano"]
+        for alvo, urls in direto["eps"].items():
+            antigas = [u for u in registro["eps"][alvo] if u not in urls]
+            registro["eps"][alvo] = urls + antigas
+
+    # Primeiro o que o acervo publicado já tinha: é ele que sabe o nome certo.
+    publicados_f = links_diretos_de_filmes(sorted(SAIDA.glob("filmes-*.txt")))
+    publicados_s = links_diretos_de_series(sorted(SAIDA.glob("series-*-*.txt")))
+    for k, direto in publicados_f.items():
+        somar_filme(k, direto)
+    for k, direto in publicados_s.items():
+        somar_serie(k, direto)
+
+    # Depois o Redeflix. O mesmo filme pode estar no acervo sem o ano
+    # ("A 5ª Vítima") e no Redeflix com ele ("A 5ª Vítima (2019)"): pelo nome
+    # seriam dois títulos. O endereço desempata — se ele já mora num filme, é
+    # aquele filme.
+    onde_mora_f = {u: k for k, r in filmes.items() for v in r["versoes"].values() for u in v
+                   if resolvido_por_id(u)}
+    onde_mora_s = {u: k for k, r in series.items() for v in r["eps"].values() for u in v
+                   if resolvido_por_id(u)}
+    diretos_filmes = links_diretos_de_filmes([redeflix / "links-filmes.txt"])
+    diretos_series = links_diretos_de_series([redeflix / "links-series.txt"])
+    for k, direto in diretos_filmes.items():
+        if k not in filmes:
+            dono = next((onde_mora_f[u] for v in direto["versoes"].values() for u in v
+                         if u in onde_mora_f), None)
+            if dono:
+                k = dono
+            else:
+                novos_filmes += 1
+        somar_filme(k, direto)
+        # Até 28/09/2026 o Redeflix gravava toda fonte de filme como dub=, e o
+        # acervo publicado guardou as legendadas no lugar das dubladas.
+        legendadas = set(direto["versoes"].get("leg", []))
+        if legendadas:
+            registro = filmes[k]
+            registro["versoes"]["dub"] = [u for u in registro["versoes"]["dub"] if u not in legendadas]
+    for k, direto in diretos_series.items():
+        if k not in series:
+            dono = next((onde_mora_s[u] for v in direto["eps"].values() for u in v
+                         if u in onde_mora_s), None)
+            if dono:
+                k = dono
+            else:
+                novas_series += 1
+        somar_serie(k, direto)
+    # Dublado achado para o que só havia legendado (dublar_legendados.py). Os
+    # arquivos já vêm com o título do acervo, então só entram em título que
+    # existe — nunca abrem um cartão novo.
+    dublados_f = dublados_e = 0
+    for k, direto in links_diretos_de_filmes([redeflix / "dublados-filmes.txt"]).items():
+        if k in filmes:
+            somar_filme(k, direto)
+            dublados_f += 1
+    for k, direto in links_diretos_de_series([redeflix / "dublados-series.txt"]).items():
+        if k in series:
+            somar_serie(k, direto)
+            dublados_e += len(direto["eps"])
+    print(f"dublado no lugar do só legendado: {dublados_f} filmes, {dublados_e} episódios")
+    # Por fim o FenixFlix (atualizar_fenix.py): só para títulos que o acervo
+    # já tem, e atrás das fontes deles — é uma opção a mais, não a primeira.
+    # Os arquivos são refeitos pelo passo dele, então não precisam ser
+    # preservados por aqui como as fontes resolvidas por id.
+    fenix = SAIDA / "fenix"
+    def qualquer_http(url):
+        return url.startswith("http")
+    fenix_filmes = fenix_eps = 0
+    do_fenix: set[str] = set()
+    for k, direto in links_diretos_de_filmes([fenix / "links-filmes.txt"], qualquer_http).items():
+        if k not in filmes:
+            continue
+        registro = filmes[k]
+        for versao, urls in direto["versoes"].items():
+            for url in urls:
+                do_fenix.add(url)
+                if url not in registro["versoes"][versao]:
+                    registro["versoes"][versao].append(url)
+        fenix_filmes += 1
+    for k, direto in links_diretos_de_series([fenix / "links-series.txt"], qualquer_http).items():
+        if k not in series:
+            continue
+        registro = series[k]
+        for alvo, urls in direto["eps"].items():
+            for url in urls:
+                do_fenix.add(url)
+                if url not in registro["eps"][alvo]:
+                    registro["eps"][alvo].append(url)
+            fenix_eps += 1
+    print(f"FenixFlix: fontes a mais em {fenix_filmes} filmes e {fenix_eps} episódios")
+
+    # O mesmo título com e sem ano: a lista M3U escreve "1 Contra Todos", o
+    # Redeflix "1 Contra Todos (2016)". Pelo nome seriam dois — e seria assim
+    # a cada montagem, porque os dois continuam vindo. Quando o sem ano tem um
+    # único irmão com ano, e esse irmão traz fonte resolvida por id (ou seja,
+    # o ano veio do TMDB, não de um palpite), os dois são o mesmo título. Com
+    # dois irmãos com ano não há como saber de qual refilmagem é: ficam como
+    # estão.
+    def juntar_sem_ano(colecao, campo):
+        com_ano = defaultdict(list)
+        for k in colecao:
+            if "|" in k:
+                com_ano[k.split("|", 1)[0]].append(k)
+        juntados = 0
+        for k in [k for k in colecao if "|" not in k]:
+            irmaos = com_ano.get(k, [])
+            if len(irmaos) != 1:
+                continue
+            irmao = colecao[irmaos[0]]
+            if not any(resolvido_por_id(u) for v in irmao[campo].values() for u in v):
+                continue
+            for alvo, urls in colecao.pop(k)[campo].items():
+                irmao[campo][alvo] += [u for u in urls if u not in irmao[campo][alvo]]
+            juntados += 1
+        return juntados
+
+    juntados = juntar_sem_ano(filmes, "versoes") + juntar_sem_ano(series, "eps")
+
+    # Fonte resolvida por id sempre na frente, na ordem em que chegou. Sem esta
+    # regra a ordem dependeria de por onde a fonte entrou nesta montagem, e o
+    # acervo mudaria a cada rodada sem ter mudado nada.
+    def na_frente(lista):
+        # Resolvidos por id na frente, o Fenix no fim: é opção a mais, e o app
+        # só chega nele quando as fontes de sempre falharem.
+        return ([u for u in lista if resolvido_por_id(u)]
+                + [u for u in lista if not resolvido_por_id(u) and u not in do_fenix]
+                + [u for u in lista if u in do_fenix])
+
+    for registro in filmes.values():
+        for versao in registro["versoes"]:
+            registro["versoes"][versao] = na_frente(registro["versoes"][versao])
+    for registro in series.values():
+        for alvo in registro["eps"]:
+            registro["eps"][alvo] = na_frente(registro["eps"][alvo])
+    print(f"títulos com e sem ano juntados: {juntados}")
+    print(f"links diretos já publicados: {len(publicados_f)} filmes, {len(publicados_s)} séries")
+    print(f"Redeflix: {len(diretos_filmes)} filmes ({novos_filmes} novos no acervo) | "
+          f"{len(diretos_series)} séries ({novas_series} novas no acervo)")
+
+    # Fontes mortas saem; título que fica sem fonte nenhuma sai do acervo.
+    mortas = fontes_mortas()
+    if mortas:
+        tirados_f, tirados_s = tirar_mortas(filmes, series, reservado, bases, mortas)
+        print(f"fontes mortas: {len(mortas)} conhecidas | sem fonte e fora do acervo: "
+              f"{tirados_f} filmes, {tirados_s} séries")
+
+    SAIDA.mkdir(exist_ok=True)
+    # As fileiras da tela inicial são geradas à parte, por gerar_destaques.py,
+    # e sobrevivem à remontagem do catálogo: apagá-las aqui deixaria a tela
+    # inicial vazia até alguém lembrar de rodar o outro script. A lista de
+    # rádios é mantida à mão e também não sai daqui: na atualização de 09/10
+    # ela foi apagada e a tela de rádios ficou vazia nos aparelhos.
+    preservar = {"destaques.txt", "generos.txt", "fichas.txt", "radios.txt"}
+    for antigo in SAIDA.glob("*.txt"):
+        if antigo.name not in preservar:
+            antigo.unlink()
+
+    def gravar_filmes(colecao, prefixo):
+        gavetas = defaultdict(list)
+        for registro in colecao.values():
+            gavetas[letra(registro["titulo"])].append(registro)
+        for chave_letra, registros in sorted(gavetas.items()):
+            linhas_saida = []
+            for registro in sorted(registros, key=lambda r: r["titulo"]):
+                partes = [f"{v}=" + ",".join(registro["versoes"][v])
+                          for v in ("dub", "leg") if registro["versoes"].get(v)]
+                linhas_saida.append(registro["titulo"] + "\t" + "\t".join(partes))
+            nome = f"{prefixo}-{chave_letra}.txt"
+            (SAIDA / nome).write_text("\n".join(linhas_saida) + "\n", encoding="utf-8")
+        return {k: len(v) for k, v in gavetas.items()}
+
+    contagem_filmes = gravar_filmes(filmes, "filmes")
+    contagem_reservado = gravar_filmes(reservado, "reservado")
+
+    gavetas_serie = defaultdict(list)
+    for registro in series.values():
+        gavetas_serie[letra(registro["titulo"])].append(registro)
+
+    total_eps = 0
+    contagem_series = {}
+    for chave_letra, registros in sorted(gavetas_serie.items()):
+        registros.sort(key=lambda r: r["titulo"])
+        contagem_series[chave_letra] = len(registros)
+        indice_linhas, pedaco, linhas_pedaco, dentro = [], 0, [], 0
+        for registro in registros:
+            if dentro >= POR_PEDACO:
+                (SAIDA / f"series-{chave_letra}-{pedaco}.txt").write_text(
+                    "\n".join(linhas_pedaco) + "\n", encoding="utf-8")
+                pedaco, linhas_pedaco, dentro = pedaco + 1, [], 0
+            eps = registro["eps"]
+            indice_linhas.append(
+                f'{registro["titulo"]}\t{registro["ano"]}\t{pedaco}\t{len(eps)}')
+            # O ano faz parte da identidade. Duas séries homônimas podem cair
+            # no mesmo pedaço e o app precisa abrir os episódios da série certa.
+            identidade = "@" + registro["titulo"]
+            if registro["ano"]:
+                identidade += "\t" + registro["ano"]
+            linhas_pedaco.append(identidade)
+            for (temporada, numero, versao) in sorted(eps):
+                total_eps += 1
+                linhas_pedaco.append(
+                    f"{temporada}\t{numero}\t{versao}\t" + ",".join(eps[(temporada, numero, versao)]))
+            dentro += 1
+        if linhas_pedaco:
+            (SAIDA / f"series-{chave_letra}-{pedaco}.txt").write_text(
+                "\n".join(linhas_pedaco) + "\n", encoding="utf-8")
+        (SAIDA / f"series-{chave_letra}.txt").write_text(
+            "\n".join(indice_linhas) + "\n", encoding="utf-8")
+
+    # Índice de busca: só nome, tipo e letra. É o que permite procurar em todo
+    # o acervo sem baixar o acervo — trinta mil linhas curtas, uma vez.
+    busca = []
+    for registro in sorted(filmes.values(), key=lambda r: r["titulo"]):
+        busca.append(f'{registro["titulo"]}\tf\t{letra(registro["titulo"])}')
+    for registro in sorted(series.values(), key=lambda r: (r["titulo"], r["ano"])):
+        linha_busca = f'{registro["titulo"]}\ts\t{letra(registro["titulo"])}'
+        if registro["ano"]:
+            linha_busca += "\t" + registro["ano"]
+        busca.append(linha_busca)
+    (SAIDA / "busca.txt").write_text("\n".join(busca) + "\n", encoding="utf-8")
+
+    # Qualidade por fonte, para o app dizer qual é 4K e abrir a melhor. Fica
+    # num arquivo à parte de propósito: acrescentar a marca ao lado do endereço
+    # quebraria as versões já instaladas, que leem "base:resto" e mais nada.
+    (SAIDA / "marcas.txt").write_text(
+        "\n".join(f"{curta}\t{q}" for curta, q in sorted(marcas.items())) + "\n",
+        encoding="utf-8")
+
+    indice_linhas = [f"base: {i} {b}" for i, b in enumerate(bases.lista)]
+    for chave_letra in sorted(set(contagem_filmes) | set(contagem_series) | set(contagem_reservado)):
+        indice_linhas.append(
+            f"{chave_letra}\t{contagem_filmes.get(chave_letra, 0)}"
+            f"\t{contagem_series.get(chave_letra, 0)}"
+            f"\t{contagem_reservado.get(chave_letra, 0)}")
+    (SAIDA / "indice.txt").write_text("\n".join(indice_linhas) + "\n", encoding="utf-8")
+
+    tamanho = sum(f.stat().st_size for f in SAIDA.glob("*.txt"))
+    fontes_filme = sum(len(v) for r in filmes.values() for v in r["versoes"].values())
+    print(f"filmes: {len(filmes)} ({fontes_filme} fontes) | séries: {len(series)} "
+          f"| episódios: {total_eps} | reservados: {len(reservado)}")
+    print(f"canais de TV ignorados: {ignorados}")
+    print(f"{len(list(SAIDA.glob('*.txt')))} arquivos, {tamanho / 1e6:.1f} MB, "
+          f"{len(bases.lista)} bases")
+    for f in sorted(SAIDA.glob("*.txt"), key=lambda f: -f.stat().st_size)[:3]:
+        print(f"   {f.name}: {f.stat().st_size / 1e6:.2f} MB")
+
+
+if __name__ == "__main__":
+    main()

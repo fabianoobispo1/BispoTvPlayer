@@ -1,0 +1,76 @@
+import Foundation
+import Combine
+
+/// Onde a navegação de filmes e séries parou.
+///
+/// A janela é uma folha: escolher um filme fecha ela, e o que estava na tela
+/// morria junto. Voltar caía sempre na primeira coluna, sem letra, sem rolagem
+/// e sem busca — quem estava percorrendo a letra M perdia o lugar a cada filme.
+/// Guardando aqui fora, reabrir cai exatamente onde parou.
+/// Qual parte do acervo está aberta no lugar do vídeo.
+enum VodSecao: String, Identifiable, CaseIterable {
+    case inicio, filmes, series, animes, doramas, extras, favoritos, eventos
+    var id: String { rawValue }
+    var titulo: String {
+        switch self {
+        case .inicio: return "Início"
+        case .filmes: return "Filmes"
+        case .series: return "Séries"
+        case .animes: return "Animes"
+        case .doramas: return "Doramas"
+        case .extras: return "Extras"
+        case .favoritos: return "Favoritos"
+        case .eventos: return "Eventos"
+        }
+    }
+    var icone: String {
+        switch self {
+        case .inicio: return "house"
+        case .filmes: return "film"
+        case .series: return "tv"
+        case .animes: return "sparkles.tv"
+        case .doramas: return "heart.rectangle"
+        case .extras: return "plus.rectangle.on.rectangle"
+        case .favoritos: return "star.fill"
+        case .eventos: return "calendar"
+        }
+    }
+    /// Extras são filmes noutro arquivo do catálogo, não outra natureza.
+    var pedeFilmes: Bool { ![.series, .animes, .doramas, .inicio, .eventos].contains(self) }
+}
+
+@MainActor
+final class VodEstado: ObservableObject {
+    static let shared = VodEstado()
+
+    @Published var gavetas: [Vod.Gaveta] = []
+    @Published var filmes = true
+    @Published var reservado = false
+    @Published var mostrandoFavoritos = false
+    /// Nula quando o vídeo está no lugar dele.
+    @Published var secao: VodSecao?
+    @Published var letra = ""
+    /// Acervo inteiro numa lista só, em vez de uma letra por vez.
+    @Published var tudo = true
+    @Published var achados: [Vod.Achado] = []
+    /// De que seção veio a lista acima: trocar de seção obriga a refazê-la.
+    @Published var achadosDe: VodSecao?
+    @Published var busca = ""
+    @Published var titulosFilme: [Filme] = []
+    @Published var titulosSerie: [Serie] = []
+    @Published var serieAberta: Serie?
+    @Published var episodios: [Episodio] = []
+    /// Episódios das coleções compactas, já publicados no mesmo arquivo.
+    @Published var episodiosColecao: [String: [Episodio]] = [:]
+    /// Último título aberto: é para ele que a lista rola ao reabrir, senão a
+    /// rolagem voltaria ao topo mesmo com a letra certa escolhida.
+    @Published var ancora: String?
+
+    private init() {}
+
+    /// Os títulos já carregados servem para a letra e a seção em que foram
+    /// carregados; trocar qualquer uma delas obriga a buscar de novo.
+    var precisaCarregar: Bool {
+        !letra.isEmpty && (filmes ? titulosFilme.isEmpty : titulosSerie.isEmpty)
+    }
+}

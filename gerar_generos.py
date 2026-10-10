@@ -48,6 +48,8 @@ carregar_tmdb_conhecidos()
 
 from pathlib import Path
 
+from tmdb_chave import chave_tmdb
+
 RAIZ = Path(__file__).resolve().parent
 VOD = RAIZ / "vod"
 SAIDA = VOD / "generos.txt"
@@ -55,7 +57,7 @@ FICHAS = VOD / "fichas.txt"
 CAPA_BASE = "https://image.tmdb.org/t/p/w342"
 CACHE = RAIZ / "arquivos-gerados" / "generos.sqlite3"
 
-CHAVE = "15d2ea6d0dc1d476efbca3eba2b9bbfb"
+CHAVE = chave_tmdb()
 TMDB = "https://api.themoviedb.org/3"
 
 # Os nomes que o TMDB usa em português, por id. Fixos aqui de propósito: são

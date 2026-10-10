@@ -15,6 +15,13 @@ rm -rf build
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Info.plist "$APP/Contents/Info.plist"
 
+# A chave do TMDB (capas e fichas) entra só no app compilado, nunca no git:
+# vem de TMDB_API_KEY ou de arquivos-gerados/tmdb-chave.txt.
+CHAVE_TMDB="${TMDB_API_KEY:-$(cat arquivos-gerados/tmdb-chave.txt 2>/dev/null || true)}"
+CHAVE_TMDB="$(printf '%s' "$CHAVE_TMDB" | tr -d '[:space:]')"
+[ -n "$CHAVE_TMDB" ] || echo "aviso: sem chave do TMDB; capas e fichas não vão carregar" >&2
+printf 'enum TMDBChave {\n    static let valor = "%s"\n}\n' "$CHAVE_TMDB" > build/TMDBChave.swift
+
 ./make_icon.sh >/dev/null
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
@@ -29,7 +36,7 @@ swiftc \
   -framework SwiftUI \
   -framework AppKit \
   -o "$APP/Contents/MacOS/BispoTv" \
-  Sources/*.swift
+  Sources/*.swift build/TMDBChave.swift
 
 codesign --force --sign - --identifier dev.bispotv.player "$APP" >/dev/null 2>&1 || true
 

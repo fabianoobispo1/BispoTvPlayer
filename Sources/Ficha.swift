@@ -52,7 +52,7 @@ struct Ficha: Sendable {
 @MainActor
 enum Fichas {
 
-    private static let chave = "15d2ea6d0dc1d476efbca3eba2b9bbfb"
+    private static let chave = TMDBChave.valor
     private static let base = "https://api.themoviedb.org/3"
     private static let imagens = "https://image.tmdb.org/t/p/"
 

@@ -46,6 +46,9 @@ jobs:
       # os passos acima acabaram de gravar.
       - name: Montar as fileiras da tela inicial
         run: python3 gerar_destaques.py
+        env:
+          # Settings → Secrets and variables → Actions → TMDB_API_KEY
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
 
       - name: Publicar somente quando houver alterações
         run: |

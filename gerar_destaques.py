@@ -29,11 +29,13 @@ from pathlib import Path
 from urllib.parse import quote
 from urllib.request import urlopen
 
+from tmdb_chave import chave_tmdb
+
 RAIZ = Path(__file__).resolve().parent
 VOD = RAIZ / "vod"
 SAIDA = VOD / "destaques.txt"
 
-CHAVE_TMDB = "15d2ea6d0dc1d476efbca3eba2b9bbfb"
+CHAVE_TMDB = chave_tmdb()
 TMDB = "https://api.themoviedb.org/3"
 CAPA_BASE = "https://image.tmdb.org/t/p/w342"
 

@@ -35,11 +35,13 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from tmdb_chave import chave_tmdb
+
 RAIZ = Path(__file__).resolve().parent
 VOD = RAIZ / "vod"
 SAIDA = VOD / "imdb"
 CACHE = RAIZ / "arquivos-gerados" / "imdb.sqlite3"
-CHAVE = "15d2ea6d0dc1d476efbca3eba2b9bbfb"
+CHAVE = chave_tmdb()
 TMDB = "https://api.themoviedb.org/3"
 FRAGMENTOS = 100
 REPESCAGEM = 30 * 86400

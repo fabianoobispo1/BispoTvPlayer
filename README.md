@@ -1,67 +1,32 @@
 <div align="center">
 
-<!-- Banner: ainda não existe um próprio do BispoTv.
-<a href="https://saimo-tv.pages.dev"><img src="https://raw.githubusercontent.com/gabrielsaimo/gabrielsaimo/main/saimo-tv/banner.svg" alt="BispoTv: canais ao vivo, filmes e séries em qualquer tela" width="100%"></a>
--->
-
 <h1>BispoTv</h1>
 
 ### canais ao vivo, filmes e séries no Mac
 
-<!-- Versão e downloads: voltam quando sair o primeiro release.
-<p>
-  <a href="https://github.com/fabianoobispo1/BispoTvPlayer/releases/latest">
-    <img src="https://img.shields.io/github/v/release/fabianoobispo1/BispoTvPlayer?label=vers%C3%A3o" alt="Versão">
-  </a>
-  <a href="https://github.com/fabianoobispo1/BispoTvPlayer/releases">
-    <img src="https://img.shields.io/github/downloads/fabianoobispo1/BispoTvPlayer/total?label=downloads" alt="Downloads">
-  </a>
-</p>
--->
-
 <p>
   <img src="https://img.shields.io/badge/Swift-FA7343?logo=swift&logoColor=white" alt="Swift">
-  <img src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white" alt="Python">
-  <!-- Dos apps que ainda não existem:
-  <img src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin">
-  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white" alt="Rust">
-  <img src="https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB" alt="React">
-  -->
+  <img src="https://img.shields.io/badge/macOS-15%2B-000000?logo=apple&logoColor=white" alt="macOS 15+">
 </p>
 
 </div>
 
-<!-- Outros apps: ainda não existem.
-<p align="center">
-  BispoTv: TV Box · Celular · Windows · <b>Mac e catálogo</b> · Site
-</p>
--->
-
 ## Sobre
 
-Este repositório é o BispoTv: o **app do Mac**, a **lista de canais e o acervo
-publicados** (que o app lê daqui) e os scripts que mantêm esses dados.
+Este repositório é só o **app do Mac**. Ele é baseado no app do
+[Saimo TV](https://github.com/gabrielsaimo/SaimoPlayer) e depende dele para os
+dados:
 
-Por enquanto só existe o app do Mac.
+| O quê | De onde vem |
+|---|---|
+| Canais ao vivo (`catalogo.txt`, `canais.txt`, `restritos.txt`) | repositório original |
+| Filmes, séries, fichas, destaques e legendas (`vod/`) | repositório original |
+| Capas e fichas do TMDB | API do TMDB, com a sua chave |
+| Servidores desligados (`fontes-desativadas.json`) | este repositório |
+| Atualizações do app (DMG) | releases deste repositório |
 
-Versão atual: **2.1.1**.
-
-## Os apps
-
-| Plataforma | Onde está o código | Download |
-|---|---|---|
-| macOS | este repositório (`Sources/`) | `BispoTv.dmg` |
-
-<!-- Ainda não existem:
-| TV Box / Android TV / Google TV | BispoTv-Android | `BispoTv.apk` |
-| Celular Android | BispoTv-Cell | `BispoTvCell.apk` |
-| Windows | BispoTv-Win | `BispoTv-Instalador.msi` |
-| Navegador | BispoTv-Site | — |
--->
-
-O DMG sai em
-[Releases](https://github.com/fabianoobispo1/BispoTvPlayer/releases/latest), e o
-app procura a versão nova ali e se oferece para atualizar.
+Quem mantém a lista de canais e o acervo é o repositório original; aqui não há
+nada para atualizar à mão.
 
 ## O que o app tem
 
@@ -75,80 +40,64 @@ app procura a versão nova ali e se oferece para atualizar.
   OpenSubtitles (pt-BR, pt-PT, inglês, espanhol) com ajuste de sincronia, sem chave
   nem cadastro (`Sources/Legendas.swift`)
 
-## App do Mac
-
 SwiftUI + AVFoundation. O AVFoundation não abre DASH nem HEVC em TS, então o app
 tem um proxy HTTP local (`ProxyServer.swift`) e um ffmpeg embutido
 (`Remuxer.swift`) que remontam o que ele recusa. Também tem PiP, AirPlay e
 Chromecast (`Cast.swift`).
 
-Na 2.0: botão de pular abertura, cartão do próximo episódio (Return assiste,
-Esc dispensa), troca de fonte quando o arquivo "termina" cedo demais e abertura
-no último canal assistido.
+## Compilar
+
+Precisa das Command Line Tools (`xcode-select --install`); o Xcode completo é
+opcional. Sem ele, o `build.sh` usa o SDK do macOS 26.5.
+
+A chave do TMDB (capas e fichas) entra no app na hora de compilar e nunca vai
+para o git. Peça a sua em themoviedb.org → Configurações → API e guarde:
 
 ```bash
-./build.sh        # monta build/BispoTv.app
-./make_dmg.sh     # gera o DMG
+mkdir -p arquivos-gerados
+echo "SUA_CHAVE" > arquivos-gerados/tmdb-chave.txt   # ou: export TMDB_API_KEY=...
 ```
 
-## Dados publicados
+```bash
+./build.sh                  # monta build/BispoTv.app
+open build/BispoTv.app
+./make_dmg.sh               # gera build/BispoTv.dmg, com o ffmpeg embutido
+```
 
-O app baixa daqui (via raw do GitHub) a lista de canais ao vivo. O acervo de
-filmes e séries (`vod/`) vem do repositório original,
-[gabrielsaimo/SaimoPlayer](https://github.com/gabrielsaimo/SaimoPlayer/tree/main/vod);
-a pasta `vod/` daqui é só uma cópia antiga, que o app não lê.
+O DMG precisa do ffmpeg instalado (`brew install ffmpeg`).
 
-- `catalogo.txt` — a lista de canais, com fontes em ordem de preferência. Cada
-  fonte pode ter um `nome:` ("Temporada 3", "Legendado") que o app mostra no
-  lugar de "Fonte N"; nos canais 24h ele sai das listas M3U pelo
-  `nomear_fontes.py`
-- `vod/` — índice e pedaços do acervo de filmes e séries, destaques e fichas
-  (gêneros, capas e ids do TMDB)
-- `vod/destaques.txt` — as fileiras da tela inicial, uma linha por título:
-  `tipo	título	letra	ano	capa	trailer`. O sexto campo é opcional: um
-  trailer direto (`.mp4` ou `.m3u8`, nunca página do YouTube), que os apps de TV e
-  celular (quando existirem) tocam sem som no destaque do topo
-- `vod/radios.txt` — as rádios, `nome|endereço|logo`, com o logo opcional.
-  Mantida à mão: `gerar_vod.py` preserva o arquivo ao remontar o acervo
+## Trazer as mudanças do original
 
-Scripts principais:
+O `.upstream-base` guarda o commit do repositório original de onde este código
+saiu (ou foi sincronizado pela última vez).
 
-| Script | Faz |
-|---|---|
-| `atualizar_tudo.sh` | roda a atualização diária do acervo, às 11h (launchd no Mac; o GitHub Actions faz a parte da RedeFlix às 11h17) |
-| `gerar_vod.py`, `gerar_generos.py`, `gerar_destaques.py` | geram o acervo, as fichas e as fileiras |
-| `atualizar_redeflix.py`, `atualizar_frostview.py`, `atualizar_fenix.py` | trazem fontes novas de cada origem |
-| `gerar_imdb.py` | publica o id do IMDb de cada título em `vod/imdb/` (fragmentos de 8 KB), para as legendas do app |
-| `dublar_legendados.py` | procura o dublado do que o acervo só tem legendado (roda dentro do `atualizar_tudo.sh`; `--dublados` refaz tudo) |
-| `limpar_fontes.py`, `remove_dead_links.py` | tiram fontes mortas |
-| `medir_fontes_local.py`, `medir_resolucao.py` | medem as fontes dos canais |
-| `fontes-mortas.txt` | fontes do acervo fora do ar (URLs e `servidor: host`); o `gerar_vod.py` tira delas e título sem fonte viva sai. Vem do `testar_fontes_vod.py` |
-| `limpar_canais.py` | testa as fontes dos canais como o app pede e, com `--aplicar`, tira as mortas (canal sem fonte sai) |
-| `ordenar_fontes.py` | põe as fontes do nexustvplay (o servidor mais estável) na frente de cada canal; rodar depois de qualquer script que mexa no catálogo |
-| `nomear_fontes.py` | dá nome às fontes do catálogo a partir das listas M3U ("[S03]" vira "Temporada 3"), para os canais 24h mostrarem a temporada |
-| `testar_fontes_vod.py` | testa as fontes do acervo: qualidade de cada uma e quais saíram do ar (só relatório, em `arquivos-gerados/fontes-vod/`) |
+```bash
+./sincronizar_original.sh --ver   # só mostra o que mudou no app original
+./sincronizar_original.sh         # traz as mudanças para cá
+```
+
+O script mescla arquivo por arquivo, já trocando os nomes (Saimo TV → BispoTv),
+e mantém o que foi mudado só aqui. Nada é commitado: confira com `git diff`,
+rode `./build.sh` e commite. Se houver conflito, o arquivo fica com marcas
+`<<<<<<<` para resolver à mão.
 
 ## Publicar uma versão
 
 ```bash
-./release.sh 2.0.0              # marca a versão e publica
-./release.sh 2.0.0 --rascunho   # cria como rascunho
+./release.sh 2.1.2              # marca a versão e publica
+./release.sh 2.1.2 --rascunho   # cria como rascunho
 ```
 
-O script grava a versão no `Info.plist`, monta o DMG e publica no release. As
-notas saem de `build/release/NOTAS.md` quando esse arquivo existe.
+O script grava a versão no `Info.plist`, monta o DMG e publica no release; o
+app instalado procura a versão nova ali e oferece a atualização. As notas saem
+de `build/release/NOTAS.md` quando esse arquivo existe.
 
 Pré-requisitos: `gh` instalado e logado (`brew install gh && gh auth login`) e o
-ffmpeg (`brew install ffmpeg`), que o DMG leva embutido.
-
-<!-- Quando existirem os outros apps, o release.sh também monta o APK da TV, o
-do celular e o instalador do Windows. Pré-requisitos desses: repositórios irmãos
-em `../BispoTv-Android`, `../BispoTv-Win` e `../BispoTv-Cell`; JDK 17; `wixl`
-(`brew install msitools`). -->
+ffmpeg.
 
 ## Avisos
 
 - Fontes externas podem sair do ar sem aviso; o sistema de fontes reserva existe
   por isso.
 - Respeite direitos autorais e de distribuição do conteúdo.
-- Não coloque tokens, credenciais ou dados pessoais em catálogos e scripts.
+- Não coloque tokens, credenciais ou dados pessoais no código.

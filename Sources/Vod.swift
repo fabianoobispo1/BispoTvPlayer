@@ -36,8 +36,8 @@ struct Episodio: Identifiable, Hashable {
 enum Vod {
 
     /// O acervo (filmes, séries, fichas, destaques e legendas) vem do
-    /// repositório original do Saimo TV, que o mantém atualizado. Os canais ao
-    /// vivo continuam vindo deste repositório (RemoteCatalog).
+    /// repositório original do Saimo TV, que o mantém atualizado — assim como
+    /// os canais ao vivo (RemoteCatalog).
     private static let base =
         "https://raw.githubusercontent.com/gabrielsaimo/SaimoPlayer/main/vod/"
 

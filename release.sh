@@ -1,12 +1,14 @@
 #!/bin/bash
 #
-# Publica uma versão: monta o DMG e sobe no release.
+# Publica uma versão: monta o DMG do Mac e o zip do Windows (de ../BispoTvWin)
+# e sobe os dois no mesmo release, com o mesmo número.
 #
-# A versão sai do Info.plist. O nome do arquivo é o contrato com o
-# atualizador: ele procura no release um .dmg.
+# A versão sai do Info.plist e é gravada também no Cargo.toml do Windows. O
+# nome dos arquivos é o contrato com os atualizadores: o Mac procura um .dmg,
+# o Windows o BispoTv-Windows.zip, e o site linka os dois.
 #
-# Os trechos comentados montam os apps da TV, do celular e do Windows, que
-# ainda não existem.
+# Os trechos comentados montam os apps da TV e do celular, que ainda não
+# existem.
 #
 #   ./release.sh                 usa a versão do Info.plist
 #   ./release.sh 1.1.0           marca esta versão antes de publicar
@@ -15,12 +17,16 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 PLIST="Info.plist"
+WIN="../BispoTvWin"
 # GRADLE="../SaimoTV-Android/app/build.gradle.kts"
 # JAVA17="/opt/homebrew/Cellar/openjdk@17/17.0.19/libexec/openjdk.jdk/Contents/Home"
 
 versao="${1:-}"
 if [ -n "$versao" ] && [ "${versao:0:2}" != "--" ]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $versao" "$PLIST"
+  if [ -d "$WIN" ]; then
+    sed -i '' "1,/^version = /s/^version = \".*\"/version = \"$versao\"/" "$WIN/Cargo.toml"
+  fi
 #   # O versionCode precisa só crescer, então vira um número a partir da versão:
 #   # 1.2.3 -> 10203. Sem isso o Android recusa a instalação por cima.
 #   codigo=$(python3 - "$versao" <<'PY'
@@ -55,11 +61,15 @@ cp "build/BispoTv.dmg" "build/release/BispoTv.dmg"
 #   cp "../SaimoTV-Android/app/build/outputs/apk/release/app-release.apk" "build/release/SaimoTV.apk"
 # fi
 
-# if [ -d ../SaimoWin ]; then
-#   echo "==> montando o app do Windows"
-#   ( cd ../SaimoWin && ./empacotar.sh >/dev/null )
-#   cp "../SaimoWin/dist/SaimoTV-Windows.zip" "build/release/SaimoTV-Windows.zip"
-# fi
+# O Windows procura a versão nova neste mesmo release: um release sem o zip
+# ofereceria a quem está no Windows um download que não existe.
+if [ -d "$WIN" ]; then
+  echo "==> montando o app do Windows"
+  ( cd "$WIN" && ./empacotar.sh >/dev/null )
+  cp "$WIN/dist/BispoTv-Windows.zip" "build/release/BispoTv-Windows.zip"
+else
+  echo "aviso: $WIN não existe; o release sai só com o Mac" >&2
+fi
 
 # # O APK do celular é montado à parte (Expo) e copiado para cá antes de publicar.
 # if [ -f "../Saimo-Cell-V2/android/app/build/outputs/apk/release/app-release.apk" ]; then
@@ -91,14 +101,25 @@ notas="build/release/NOTAS.md"
 
 ### Como instalar
 
+**Mac** (chip Apple, macOS 15 ou mais novo):
+
 1. Baixe o `BispoTv.dmg` abaixo, abra e arraste o Bispo TV para Aplicativos.
 2. Na primeira vez, o macOS avisa que não pode verificar o desenvolvedor (o app
    não é assinado pela Apple). Abra **Ajustes do Sistema → Privacidade e
    Segurança**, desça até o aviso do Bispo TV e clique em **Abrir Mesmo Assim**.
 
-Requer Mac com Apple Silicon (M1 ou mais novo) e macOS 15 ou mais recente.
-As licenças do FFmpeg e das bibliotecas embutidas vão dentro do app: clique com o botão direito
-no Bispo TV › Mostrar Conteúdo do Pacote › Contents › Resources › Licencas.
+**Windows** (10 ou 11, 64 bits):
+
+1. Baixe o `BispoTv-Windows.zip` abaixo, clique com o botão direito nele e
+   escolha **Extrair Tudo...**.
+2. Abra o **Bispo TV.exe** de dentro da pasta extraída (a `libmpv-2.dll` precisa
+   ficar ao lado dele).
+3. Se o Windows Defender avisar, clique em **Mais informações** e depois em
+   **Executar assim mesmo**: o app não tem assinatura paga da Microsoft.
+
+As licenças do FFmpeg (Mac) e do mpv (Windows) vão junto: no Mac, botão direito
+no Bispo TV › Mostrar Conteúdo do Pacote › Contents › Resources › Licencas; no
+Windows, a pasta Licencas ao lado do programa.
 INSTALAR
 } > "$notas"
 
@@ -114,6 +135,13 @@ if ! git diff --quiet -- "$PLIST"; then
 fi
 echo "==> enviando para o GitHub"
 git push -q origin HEAD
+if [ -d "$WIN" ]; then
+  ( cd "$WIN"
+    if ! git diff --quiet -- Cargo.toml Cargo.lock; then
+      git commit -q -m "Versão $versao" -- Cargo.toml Cargo.lock
+    fi
+    git push -q origin HEAD )
+fi
 
 # Com o remote "upstream" (o original, do sincronizar_original.sh) o gh não
 # sabe sozinho em qual repositório publicar: é sempre no origin.
@@ -125,8 +153,8 @@ gh release create "v$versao" --repo "$repo" \
   --title "Bispo TV $versao" \
   --notes-file "$notas" \
   $extra \
-  build/release/BispoTv.dmg
-  # Quando existirem os outros apps:
-  # $(ls build/release/*.apk build/release/*.zip 2>/dev/null)
+  build/release/BispoTv.dmg \
+  $(ls build/release/*.zip 2>/dev/null)
+  # Quando existirem os apps Android: $(ls build/release/*.apk 2>/dev/null)
 
 echo "pronto: https://github.com/$repo/releases/tag/v$versao"

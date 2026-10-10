@@ -1,6 +1,9 @@
-# Publicar uma versão nova do BispoTv
+# Publicar uma versão nova do Bispo TV
 
-Passo a passo para lançar uma versão do app do Mac. O resto do projeto está no
+Passo a passo para lançar uma versão. Um release só leva o app do Mac
+(`BispoTv.dmg`) e o do Windows (`BispoTv-Windows.zip`, de
+[BispoTvWin](https://github.com/fabianoobispo1/BispoTvWin), que precisa estar
+na pasta ao lado desta), com o mesmo número. O resto do projeto está no
 [README](README.md).
 
 ## Uma vez só, em cada Mac
@@ -8,6 +11,8 @@ Passo a passo para lançar uma versão do app do Mac. O resto do projeto está n
 ```bash
 xcode-select --install            # Command Line Tools (o Xcode completo é opcional)
 brew install ffmpeg gh            # ffmpeg vai dentro do DMG; gh publica o release
+brew install rustup mingw-w64 p7zip   # para montar o app do Windows
+rustup default stable && rustup target add x86_64-pc-windows-gnu
 gh auth login                     # GitHub.com → HTTPS → login pelo navegador
 
 # chave do TMDB (capas e fichas); fica fora do git
@@ -55,9 +60,12 @@ O `release.sh` faz o push; não precisa ter nada pendente além disso.
 ./release.sh 2.1.2 --rascunho     # ou como rascunho, para revisar no site antes
 ```
 
-O script grava a versão no `Info.plist`, monta o DMG com o ffmpeg e as
-licenças, commita a versão nova, dá push e cria o release `v2.1.2` com o
-`BispoTv.dmg` e as notas. Para notas
+O script grava a versão no `Info.plist` e no `Cargo.toml` do Windows, monta o
+DMG (com o ffmpeg e as licenças) e o zip do Windows (com o mpv e as licenças),
+commita a versão nova e dá push nos dois repositórios, e cria o release
+`v2.1.2` com os dois arquivos e as notas. Se `../BispoTvWin` não existir, ele
+avisa e publica só o Mac — evite: o app do Windows procura a versão nova no
+mesmo release e ofereceria um download que não existe. Para notas
 próprias, escreva um `NOTAS.md` na raiz antes; sem ele, entram os commits desde
 a versão anterior. As instruções de instalação entram sempre.
 
@@ -77,7 +85,8 @@ Para ele funcionar:
 - a tag tem que ser um número de versão: `v2.1.2` ou `2.1.2` (nada de `beta-2`);
 - o número tem que ser maior que o do app instalado (compara parte por parte:
   `2.10.0` é mais novo que `2.9.3`);
-- o release tem que ter um arquivo `.dmg` (o `release.sh` sobe `BispoTv.dmg`);
+- o release tem que ter o `BispoTv.dmg` (Mac) e o `BispoTv-Windows.zip`
+  (Windows, que procura exatamente esse nome);
 - rascunhos e pré-lançamentos não contam como "último release".
 
 ## Problemas comuns

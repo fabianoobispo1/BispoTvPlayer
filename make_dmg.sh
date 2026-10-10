@@ -14,6 +14,8 @@ rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
+# As licenças do ffmpeg e das bibliotecas embutidas, à vista de quem baixa.
+[ -d "$APP/Contents/Resources/Licencas" ] && cp -R "$APP/Contents/Resources/Licencas" "$STAGE/Licenças"
 
 hdiutil create -volname "BispoTv" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"

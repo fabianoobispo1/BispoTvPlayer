@@ -7,6 +7,8 @@ rewritten to load from Contents/Frameworks, making the bundle self-contained.
 """
 import os
 import glob
+import json
+import re
 import shutil
 import subprocess
 import sys
@@ -44,6 +46,70 @@ def deps(binary):
     return found
 
 
+def formula_of(path):
+    """("x264", "r3222") para um arquivo dentro do Cellar do Homebrew."""
+    m = re.search(r"/Cellar/([^/]+)/([^/]+)/", os.path.realpath(path))
+    return (m.group(1), m.group(2)) if m else None
+
+
+def write_licenses(app, files):
+    """Licenças de tudo o que foi embutido, em Contents/Resources/Licencas.
+
+    O ffmpeg do Homebrew é GPL (e as bibliotecas que ele puxa, como x264 e
+    x265, também): distribuí-lo dentro do app exige levar junto o texto das
+    licenças e dizer onde está o código-fonte de cada uma.
+    """
+    formulas = {}
+    for path in files:
+        found = formula_of(path)
+        if found:
+            formulas[found[0]] = found[1]
+    if not formulas:
+        return
+    info = {}
+    try:
+        out = subprocess.run(["brew", "info", "--json=v2", *sorted(formulas)],
+                             capture_output=True, text=True, check=True).stdout
+        for f in json.loads(out)["formulae"]:
+            info[f["name"]] = f
+    except (OSError, subprocess.CalledProcessError, ValueError, KeyError):
+        pass
+
+    pasta = os.path.join(app, "Contents", "Resources", "Licencas")
+    shutil.rmtree(pasta, ignore_errors=True)
+    os.makedirs(pasta)
+    linhas = [
+        "COMPONENTES DE TERCEIROS",
+        "",
+        "O BispoTv inclui o FFmpeg (https://ffmpeg.org) e as bibliotecas abaixo,",
+        "copiados sem modificação do Homebrew. Cada um segue a própria licença; o",
+        "texto de cada licença está na pasta com o nome do componente. O código-fonte",
+        "correspondente a cada versão está no endereço indicado.",
+        "",
+    ]
+    for nome in sorted(formulas):
+        versao = formulas[nome]
+        f = info.get(nome, {})
+        fonte = (f.get("urls", {}).get("stable", {}) or {}).get("url", "")
+        linhas += [
+            f"{nome} {versao}",
+            f"  licença: {f.get('license') or 'ver pasta'}",
+            f"  site:    {f.get('homepage', '')}",
+            f"  fonte:   {fonte}",
+            "",
+        ]
+        destino = os.path.join(pasta, nome)
+        raiz = os.path.join("/opt/homebrew/Cellar", nome, versao)
+        for arq in sorted(glob.glob(os.path.join(raiz, "*"))):
+            base = os.path.basename(arq).upper()
+            if os.path.isfile(arq) and base.startswith(("COPYING", "LICENSE", "LICENCE", "NOTICE")):
+                os.makedirs(destino, exist_ok=True)
+                shutil.copy2(arq, destino)
+    with open(os.path.join(pasta, "LEIA-ME.txt"), "w", encoding="utf-8") as saida:
+        saida.write("\n".join(linhas))
+    print(f"licenças de {len(formulas)} componentes em Contents/Resources/Licencas")
+
+
 def main():
     app = sys.argv[1]
     # ffprobe comes along because the remuxer counts audio tracks before it
@@ -71,6 +137,7 @@ def main():
 
     # Breadth-first over the dependency graph, copying each library once.
     copied = {}
+    seen_deps = []
     queue = list(targets)
     while queue:
         binary = queue.pop()
@@ -84,6 +151,7 @@ def main():
                 subprocess.run(["install_name_tool", "-id",
                                 f"@loader_path/{name}", dest], capture_output=True, check=True)
                 copied[name] = dest
+                seen_deps.append(dep)
                 queue.append(dest)
 
             # ffmpeg sits in Resources, the libraries next to each other.
@@ -97,6 +165,9 @@ def main():
 
     for binary in targets:
         subprocess.run([binary, "-version"], capture_output=True, check=True)
+
+    write_licenses(app, [os.path.realpath(p) for p in tools.values()] + [
+        resolve_dependency(dep) for dep in seen_deps])
 
     print(f"{'+'.join(sorted(tools))} embutidos com {len(copied)} bibliotecas")
     return 0

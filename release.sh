@@ -75,15 +75,31 @@ cp "build/BispoTv.dmg" "build/release/BispoTv.dmg"
 #   done
 # fi
 
+# As notas: NOTAS.md na raiz, se você escreveu uma; senão, os commits desde a
+# última versão. Fica fora de build/, que o build.sh apaga a cada montagem.
 notas="build/release/NOTAS.md"
-if [ ! -f "$notas" ]; then
-  {
-    echo "## BispoTv $versao"
-    echo
-    git log --pretty="- %s" "$(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~10)"..HEAD \
+{
+  echo "## BispoTv $versao"
+  echo
+  if [ -f NOTAS.md ]; then
+    cat NOTAS.md
+  else
+    git log --pretty="- %s" "$(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)"..HEAD \
       | grep -v "^- Merge" || true
-  } > "$notas"
-fi
+  fi
+  cat <<'INSTALAR'
+
+### Como instalar
+
+1. Baixe o `BispoTv.dmg` abaixo, abra e arraste o BispoTv para Aplicativos.
+2. Na primeira vez, o macOS avisa que não pode verificar o desenvolvedor (o app
+   não é assinado pela Apple). Abra **Ajustes do Sistema → Privacidade e
+   Segurança**, desça até o aviso do BispoTv e clique em **Abrir Mesmo Assim**.
+
+Requer Mac com Apple Silicon (M1 ou mais novo) e macOS 15 ou mais recente.
+As licenças do FFmpeg e das bibliotecas embutidas estão na pasta *Licenças* do DMG.
+INSTALAR
+} > "$notas"
 
 extra=""
 for arg in "$@"; do

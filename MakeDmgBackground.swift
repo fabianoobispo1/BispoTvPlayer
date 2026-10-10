@@ -8,9 +8,12 @@ import AppKit
 
 let largura: CGFloat = 660
 let altura: CGFloat = 440
+// A imagem vai além da janela, na mesma cor: se o Finder abrir a janela maior
+// que a pedida (acontece), não aparece faixa branca nas bordas.
+let larguraTela: CGFloat = 1400
+let alturaTela: CGFloat = 900
 let iconeApp = NSPoint(x: 175, y: 205)
 let iconeAplicativos = NSPoint(x: 485, y: 205)
-let iconeLicencas = NSPoint(x: 585, y: 360)
 
 let argumentos = CommandLine.arguments
 let saida = argumentos.count > 1 ? argumentos[1] : "dmg-fundo.png"
@@ -33,7 +36,7 @@ func fonte(_ tamanho: CGFloat, _ peso: NSFont.Weight) -> NSFont {
 }
 
 /// Converte do sistema do Finder (origem em cima) para o do AppKit (origem embaixo).
-func y(_ topo: CGFloat) -> CGFloat { altura - topo }
+func y(_ topo: CGFloat) -> CGFloat { alturaTela - topo }
 
 func texto(_ s: String, _ f: NSFont, _ cor: NSColor, centroX: CGFloat? = nil,
            esquerda: CGFloat? = nil, direita: CGFloat? = nil, topo: CGFloat) {
@@ -44,21 +47,21 @@ func texto(_ s: String, _ f: NSFont, _ cor: NSColor, centroX: CGFloat? = nil,
 }
 
 guard let rep = NSBitmapImageRep(
-    bitmapDataPlanes: nil, pixelsWide: Int(largura * escala), pixelsHigh: Int(altura * escala),
+    bitmapDataPlanes: nil, pixelsWide: Int(larguraTela * escala), pixelsHigh: Int(alturaTela * escala),
     bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
     colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
 else { fatalError("sem bitmap") }
-rep.size = NSSize(width: largura, height: altura)
+rep.size = NSSize(width: larguraTela, height: alturaTela)
 
 NSGraphicsContext.saveGraphicsState()
 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
 
 fundo.setFill()
-NSRect(x: 0, y: 0, width: largura, height: altura).fill()
+NSRect(x: 0, y: 0, width: larguraTela, height: alturaTela).fill()
 
 // Faixa de cor no topo, no degradê do logo.
 NSGradient(colors: [turquesa, roxo, rosa])!
-    .draw(in: NSRect(x: 0, y: y(6), width: largura, height: 6), angle: 0)
+    .draw(in: NSRect(x: 0, y: y(6), width: larguraTela, height: 6), angle: 0)
 
 texto("Bispo TV", fonte(30, .bold), marinho, centroX: largura / 2, topo: 34)
 texto("Arraste o Bispo TV para a pasta Aplicativos", fonte(15, .medium), cinza,
@@ -87,11 +90,9 @@ NSGradient(colors: [turquesa, roxo, rosa])!
     .draw(in: NSRect(x: inicio - 10, y: meio - 20, width: fim - inicio + 20, height: 40), angle: 0)
 NSGraphicsContext.restoreGraphicsState()
 
-// Rodapé: requisito à esquerda e a indicação da pasta de licenças.
+// Rodapé: o requisito.
 texto("Requer Mac com chip Apple e macOS 15 ou mais novo", fonte(12, .regular), cinza,
-      esquerda: 28, topo: 412)
-texto("Licenças do FFmpeg e das bibliotecas  →", fonte(12, .regular), cinza,
-      direita: iconeLicencas.x - 62, topo: iconeLicencas.y - 9)
+      centroX: largura / 2, topo: 380)
 
 NSGraphicsContext.restoreGraphicsState()
 

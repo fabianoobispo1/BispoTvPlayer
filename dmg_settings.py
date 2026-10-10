@@ -5,13 +5,13 @@ import os
 
 app = defines["app"]            # noqa: F821 — o dmgbuild injeta `defines`
 fundo = defines["fundo"]        # noqa: F821
-licencas = defines.get("licencas", "")  # noqa: F821
 
 nome_app = os.path.basename(app)
 
 format = "UDZO"
 filesystem = "HFS+"
-files = [app] + ([(licencas, "Licenças")] if licencas else [])
+# As licenças do ffmpeg vão dentro do app (Contents/Resources/Licencas).
+files = [app]
 symlinks = {"Applications": "/Applications"}
 hide_extensions = [nome_app]
 
@@ -28,5 +28,4 @@ text_size = 13
 icon_locations = {
     nome_app: (175, 205),
     "Applications": (485, 205),
-    "Licenças": (585, 360),
 }

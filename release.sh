@@ -97,7 +97,8 @@ notas="build/release/NOTAS.md"
    Segurança**, desça até o aviso do Bispo TV e clique em **Abrir Mesmo Assim**.
 
 Requer Mac com Apple Silicon (M1 ou mais novo) e macOS 15 ou mais recente.
-As licenças do FFmpeg e das bibliotecas embutidas estão na pasta *Licenças* do DMG.
+As licenças do FFmpeg e das bibliotecas embutidas vão dentro do app: clique com o botão direito
+no Bispo TV › Mostrar Conteúdo do Pacote › Contents › Resources › Licencas.
 INSTALAR
 } > "$notas"
 

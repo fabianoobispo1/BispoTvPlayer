@@ -31,9 +31,7 @@ if [ ! -x "$VENV/bin/dmgbuild" ]; then
 fi
 
 rm -f "$DMG"
-licencas="$APP/Contents/Resources/Licencas"
-[ -d "$licencas" ] || licencas=""
 "$VENV/bin/dmgbuild" -s dmg_settings.py \
-  -D app="$APP" -D fundo=build/dmg-fundo.tiff -D licencas="$licencas" \
+  -D app="$APP" -D fundo=build/dmg-fundo.tiff \
   "Bispo TV" "$DMG" >/dev/null
 echo "DMG: $DMG ($(du -h "$DMG" | cut -f1))"

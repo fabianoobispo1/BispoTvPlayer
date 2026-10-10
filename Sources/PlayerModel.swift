@@ -1265,7 +1265,7 @@ final class PlayerModel: NSObject, ObservableObject {
     private func updateNowPlaying(channel: Channel) {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
             MPMediaItemPropertyTitle: channel.name,
-            MPMediaItemPropertyArtist: "BispoTv",
+            MPMediaItemPropertyArtist: "Bispo TV",
             MPNowPlayingInfoPropertyIsLiveStream: true,
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
         ]

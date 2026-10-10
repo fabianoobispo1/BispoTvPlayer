@@ -30,7 +30,7 @@ struct BispoTvApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("BispoTv") {
+        WindowGroup("Bispo TV") {
             ContentView()
         }
         .windowStyle(.hiddenTitleBar)

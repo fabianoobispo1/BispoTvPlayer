@@ -13,7 +13,7 @@
 #   nosso  = o arquivo daqui
 #
 # Base e deles passam antes pela mesma troca de nomes deste repositório
-# (Saimo TV -> BispoTv etc.), para que só as mudanças de verdade apareçam. O
+# (Saimo TV -> Bispo TV etc.), para que só as mudanças de verdade apareçam. O
 # que foi mudado só aqui (URLs, chave do TMDB, telemetria) continua como está.
 #
 # Nada é commitado: o resultado fica na pasta para você revisar com
@@ -32,14 +32,14 @@ CAMINHOS=(Sources Info.plist build.sh make_dmg.sh make_icon.sh MakeIcon.swift bu
 # A mesma troca de nomes feita ao trazer o código para cá. Vale para o conteúdo
 # e para o nome dos arquivos (Sources/SaimoApp.swift -> Sources/BispoTvApp.swift).
 renomear() {
-  sed -e 's#/Applications/Saimo TV\.app#/Applications/BispoTv.app#g' \
-      -e 's#build/Saimo TV\.app#build/BispoTv.app#g' \
+  sed -e 's#/Applications/Saimo TV\.app#/Applications/Bispo TV.app#g' \
+      -e 's#build/Saimo TV\.app#build/Bispo TV.app#g' \
       -e 's#SaimoTV-Catalog#BispoTv-Catalog#g' \
       -e 's#dev\.saimo\.#dev.bispotv.#g' \
-      -e 's#Saimo TV#BispoTv#g' \
-      -e 's#SAIMO TV#BISPOTV#g' \
+      -e 's#Saimo TV#Bispo TV#g' \
+      -e 's#SAIMO TV#BISPO TV#g' \
       -e 's#SaimoApp#BispoTvApp#g' \
-      -e 's#Saimo Monitor#BispoTv Monitor#g' \
+      -e 's#Saimo Monitor#monitor do Bispo TV#g' \
       -e 's#"saimo\.m3u"#"bispotv.m3u"#g' \
       -e 's#sender-saimo#sender-bispotv#g' \
       -e 's#saimo-remux#bispotv-remux#g' \

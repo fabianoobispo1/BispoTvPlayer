@@ -110,7 +110,7 @@ struct ContentView: View {
             }
         }
         .onAppear { scheduleHide(after: 3) }
-        .navigationTitle(model.selectedChannel?.name ?? "BispoTv")
+        .navigationTitle(model.selectedChannel?.name ?? "Bispo TV")
         .toolbar(removing: .title)
         .toolbarBackground(.hidden, for: .windowToolbar)
     }

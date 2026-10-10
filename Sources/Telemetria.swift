@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-/// O que o BispoTv Monitor fica sabendo deste Mac.
+/// O que o monitor do Bispo TV fica sabendo deste Mac.
 ///
 /// Que o app abriu (versão, modelo, sistema), o que está tocando de tempos em
 /// tempos, e quando uma fonte falha, um canal cai ou o app quebrou na última

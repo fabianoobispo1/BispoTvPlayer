@@ -81,7 +81,7 @@ def write_licenses(app, files):
     linhas = [
         "COMPONENTES DE TERCEIROS",
         "",
-        "O BispoTv inclui o FFmpeg (https://ffmpeg.org) e as bibliotecas abaixo,",
+        "O Bispo TV inclui o FFmpeg (https://ffmpeg.org) e as bibliotecas abaixo,",
         "copiados sem modificação do Homebrew. Cada um segue a própria licença; o",
         "texto de cada licença está na pasta com o nome do componente. O código-fonte",
         "correspondente a cada versão está no endereço indicado.",

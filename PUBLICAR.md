@@ -34,7 +34,7 @@ daqui, o de baixo é o do original.
 ### 2. Testar
 
 ```bash
-./build.sh && open build/BispoTv.app
+./build.sh && open "build/Bispo TV.app"
 ```
 
 Confira pelo menos: um canal ao vivo abre, Filmes e Séries carregam com capa,

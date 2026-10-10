@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="build/BispoTv.app"
+APP="build/Bispo TV.app"
 STAGE="build/dmg"
 DMG="build/BispoTv.dmg"
 
@@ -17,6 +17,6 @@ ln -s /Applications "$STAGE/Applications"
 # As licenças do ffmpeg e das bibliotecas embutidas, à vista de quem baixa.
 [ -d "$APP/Contents/Resources/Licencas" ] && cp -R "$APP/Contents/Resources/Licencas" "$STAGE/Licenças"
 
-hdiutil create -volname "BispoTv" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "Bispo TV" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"
 echo "DMG: $DMG ($(du -h "$DMG" | cut -f1))"

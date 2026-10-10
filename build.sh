@@ -2,7 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-APP="build/BispoTv.app"
+APP="build/Bispo TV.app"
 
 # Sem o Xcode, o SDK do macOS 27 das Command Line Tools não tem o plugin das
 # macros do SwiftUI (@State). O SDK 26.5 compila sem ele.

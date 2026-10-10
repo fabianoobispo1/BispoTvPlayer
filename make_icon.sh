@@ -24,7 +24,7 @@ if ! iconutil -c icns "$SET" -o build/AppIcon.icns 2>/dev/null; then
   # Algumas versões do macOS 26 recusam até iconsets gerados pelo próprio
   # iconutil. A versão instalada possui exatamente o mesmo ícone e permite
   # que a compilação continue enquanto o utilitário do sistema está assim.
-  INSTALLED="/Applications/BispoTv.app/Contents/Resources/AppIcon.icns"
+  INSTALLED="/Applications/Bispo TV.app/Contents/Resources/AppIcon.icns"
   if [ -f "$INSTALLED" ]; then
     cp "$INSTALLED" build/AppIcon.icns
   else

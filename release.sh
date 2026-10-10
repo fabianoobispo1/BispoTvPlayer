@@ -79,7 +79,7 @@ cp "build/BispoTv.dmg" "build/release/BispoTv.dmg"
 # última versão. Fica fora de build/, que o build.sh apaga a cada montagem.
 notas="build/release/NOTAS.md"
 {
-  echo "## BispoTv $versao"
+  echo "## Bispo TV $versao"
   echo
   if [ -f NOTAS.md ]; then
     cat NOTAS.md
@@ -91,10 +91,10 @@ notas="build/release/NOTAS.md"
 
 ### Como instalar
 
-1. Baixe o `BispoTv.dmg` abaixo, abra e arraste o BispoTv para Aplicativos.
+1. Baixe o `BispoTv.dmg` abaixo, abra e arraste o Bispo TV para Aplicativos.
 2. Na primeira vez, o macOS avisa que não pode verificar o desenvolvedor (o app
    não é assinado pela Apple). Abra **Ajustes do Sistema → Privacidade e
-   Segurança**, desça até o aviso do BispoTv e clique em **Abrir Mesmo Assim**.
+   Segurança**, desça até o aviso do Bispo TV e clique em **Abrir Mesmo Assim**.
 
 Requer Mac com Apple Silicon (M1 ou mais novo) e macOS 15 ou mais recente.
 As licenças do FFmpeg e das bibliotecas embutidas estão na pasta *Licenças* do DMG.
@@ -121,7 +121,7 @@ repo="$(git remote get-url origin | sed -E 's#^(https://github.com/|git@github.c
 echo "==> publicando v$versao em $repo"
 gh release create "v$versao" --repo "$repo" \
   --target "$(git rev-parse HEAD)" \
-  --title "BispoTv $versao" \
+  --title "Bispo TV $versao" \
   --notes-file "$notas" \
   $extra \
   build/release/BispoTv.dmg

@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1>BispoTv</h1>
+<h1>Bispo TV</h1>
 
 ### canais ao vivo, filmes e séries no Mac
 
@@ -59,8 +59,8 @@ echo "SUA_CHAVE" > arquivos-gerados/tmdb-chave.txt   # ou: export TMDB_API_KEY=.
 ```
 
 ```bash
-./build.sh                  # monta build/BispoTv.app
-open build/BispoTv.app
+./build.sh                  # monta "build/Bispo TV.app"
+open "build/Bispo TV.app"
 ./make_dmg.sh               # gera build/BispoTv.dmg, com o ffmpeg embutido
 ```
 
@@ -76,7 +76,7 @@ saiu (ou foi sincronizado pela última vez).
 ./sincronizar_original.sh         # traz as mudanças para cá
 ```
 
-O script mescla arquivo por arquivo, já trocando os nomes (Saimo TV → BispoTv),
+O script mescla arquivo por arquivo, já trocando os nomes (Saimo TV → Bispo TV),
 e mantém o que foi mudado só aqui. Nada é commitado: confira com `git diff`,
 rode `./build.sh` e commite. Se houver conflito, o arquivo fica com marcas
 `<<<<<<<` para resolver à mão.

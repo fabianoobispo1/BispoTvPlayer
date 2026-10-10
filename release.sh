@@ -1,14 +1,15 @@
 #!/bin/bash
 #
-# Publica uma versão: monta o DMG do Mac e o zip do Windows (de ../BispoTvWin)
-# e sobe os dois no mesmo release, com o mesmo número.
+# Publica uma versão: monta o DMG do Mac, o zip do Windows (de ../BispoTvWin) e
+# o APK da TV Box (de ../BispoTvAndroid), e sobe os três no mesmo release, com o
+# mesmo número.
 #
-# A versão sai do Info.plist e é gravada também no Cargo.toml do Windows. O
-# nome dos arquivos é o contrato com os atualizadores: o Mac procura um .dmg,
-# o Windows o BispoTv-Windows.zip, e o site linka os dois.
+# A versão sai do Info.plist e é gravada também no Cargo.toml do Windows e no
+# Gradle da TV Box. O nome dos arquivos é o contrato com os atualizadores: o
+# Mac procura um .dmg, o Windows o BispoTv-Windows.zip, a TV Box o BispoTv.apk,
+# e o site linka os três.
 #
-# Os trechos comentados montam os apps da TV e do celular, que ainda não
-# existem.
+# O trecho comentado monta o app do celular, que ainda não existe.
 #
 #   ./release.sh                 usa a versão do Info.plist
 #   ./release.sh 1.1.0           marca esta versão antes de publicar
@@ -18,8 +19,9 @@ cd "$(dirname "$0")"
 
 PLIST="Info.plist"
 WIN="../BispoTvWin"
-# GRADLE="../SaimoTV-Android/app/build.gradle.kts"
-# JAVA17="/opt/homebrew/Cellar/openjdk@17/17.0.19/libexec/openjdk.jdk/Contents/Home"
+TV="../BispoTvAndroid"
+GRADLE="$TV/app/build.gradle.kts"
+JAVA17="/opt/homebrew/opt/openjdk@17"
 
 versao="${1:-}"
 if [ -n "$versao" ] && [ "${versao:0:2}" != "--" ]; then
@@ -27,18 +29,18 @@ if [ -n "$versao" ] && [ "${versao:0:2}" != "--" ]; then
   if [ -d "$WIN" ]; then
     sed -i '' "1,/^version = /s/^version = \".*\"/version = \"$versao\"/" "$WIN/Cargo.toml"
   fi
-#   # O versionCode precisa só crescer, então vira um número a partir da versão:
-#   # 1.2.3 -> 10203. Sem isso o Android recusa a instalação por cima.
-#   codigo=$(python3 - "$versao" <<'PY'
-# import sys
-# p = (sys.argv[1].split(".") + ["0", "0"])[:3]
-# print(int(p[0]) * 10000 + int(p[1]) * 100 + int(p[2]))
-# PY
-# )
-#   if [ -f "$GRADLE" ]; then
-#     sed -i '' "s/versionName = \".*\"/versionName = \"$versao\"/" "$GRADLE"
-#     sed -i '' "s/versionCode = .*/versionCode = $codigo/" "$GRADLE"
-#   fi
+  # O versionCode precisa só crescer, então vira um número a partir da versão:
+  # 1.2.3 -> 10203. Sem isso o Android recusa a instalação por cima.
+  codigo=$(python3 - "$versao" <<'PY'
+import sys
+p = (sys.argv[1].split(".") + ["0", "0"])[:3]
+print(int(p[0]) * 10000 + int(p[1]) * 100 + int(p[2]))
+PY
+)
+  if [ -f "$GRADLE" ]; then
+    sed -i '' "s/versionName = \".*\"/versionName = \"$versao\"/" "$GRADLE"
+    sed -i '' "s/versionCode = .*/versionCode = $codigo/" "$GRADLE"
+  fi
   shift
 else
   versao=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
@@ -51,15 +53,17 @@ echo "==> montando o DMG"
 mkdir -p build/release
 cp "build/BispoTv.dmg" "build/release/BispoTv.dmg"
 
-# # Os apps da TV e do Windows só entram quando os projetos estão ao lado deste.
-# if [ -d ../SaimoTV-Android ]; then
-#   echo "==> montando o APK da TV"
-#   # assembleRelease, e não Debug: o APK publicado sai assinado com a chave da
-#   # pasta chaves, que é o que permite atualizar por cima.
-#   ( cd ../SaimoTV-Android && JAVA_HOME="$JAVA17" ANDROID_HOME="$HOME/Library/Android/sdk" \
-#     ./gradlew assembleRelease -q )
-#   cp "../SaimoTV-Android/app/build/outputs/apk/release/app-release.apk" "build/release/SaimoTV.apk"
-# fi
+# A TV Box também procura a versão nova neste release (BispoTv.apk).
+if [ -d "$TV" ]; then
+  echo "==> montando o APK da TV Box"
+  # assembleRelease, e não Debug: o APK publicado sai assinado com a chave de
+  # $TV/chaves (ver keystore.properties), que é o que permite atualizar por cima.
+  ( cd "$TV" && JAVA_HOME="$JAVA17" ANDROID_HOME="$HOME/Library/Android/sdk" \
+    ./gradlew assembleRelease -q --console=plain )
+  cp "$TV/app/build/outputs/apk/release/app-release.apk" "build/release/BispoTv.apk"
+else
+  echo "aviso: $TV não existe; o release sai sem a TV Box" >&2
+fi
 
 # O Windows procura a versão nova neste mesmo release: um release sem o zip
 # ofereceria a quem está no Windows um download que não existe.
@@ -72,18 +76,18 @@ else
 fi
 
 # # O APK do celular é montado à parte (Expo) e copiado para cá antes de publicar.
-# if [ -f "../Saimo-Cell-V2/android/app/build/outputs/apk/release/app-release.apk" ]; then
-#   cp "../Saimo-Cell-V2/android/app/build/outputs/apk/release/app-release.apk" "build/release/SaimoCell.apk"
+# if [ -f "../BispoTv-Cell/android/app/build/outputs/apk/release/app-release.apk" ]; then
+#   cp "../BispoTv-Cell/android/app/build/outputs/apk/release/app-release.apk" "build/release/BispoTvCell.apk"
 # fi
 
-# if ls build/release/*.apk >/dev/null 2>&1; then
-#   echo "==> conferindo as assinaturas"
-#   APKSIGNER=$(ls "$HOME"/Library/Android/sdk/build-tools/*/apksigner | tail -1)
-#   for apk in build/release/*.apk; do
-#   echo "    $(basename "$apk"): $("$APKSIGNER" verify --print-certs "$apk" 2>/dev/null \
-#     | grep -m1 -o 'SHA-256 digest: .*')"
-#   done
-# fi
+if ls build/release/*.apk >/dev/null 2>&1; then
+  echo "==> conferindo as assinaturas"
+  APKSIGNER=$(ls "$HOME"/Library/Android/sdk/build-tools/*/apksigner | tail -1)
+  for apk in build/release/*.apk; do
+    echo "    $(basename "$apk"): $(JAVA_HOME="$JAVA17" "$APKSIGNER" verify --print-certs "$apk" 2>/dev/null \
+      | grep -m1 -o 'SHA-256 digest: .*')"
+  done
+fi
 
 # As notas: NOTAS.md na raiz, se você escreveu uma; senão, os commits desde a
 # última versão. Fica fora de build/, que o build.sh apaga a cada montagem.
@@ -117,6 +121,13 @@ notas="build/release/NOTAS.md"
 3. Se o Windows Defender avisar, clique em **Mais informações** e depois em
    **Executar assim mesmo**: o app não tem assinatura paga da Microsoft.
 
+**TV Box, Fire TV Stick, Android TV e Google TV** (Android 6 ou mais novo):
+
+1. Instale o app **Downloader** pela loja do aparelho.
+2. Permita que ele instale apps (Fire TV: Configurações › Meu Fire TV ›
+   Opções do desenvolvedor › Instalar apps desconhecidos).
+3. No Downloader, digite `bispotv.pages.dev/tvbox` e instale o `BispoTv.apk`.
+
 As licenças do FFmpeg (Mac) e do mpv (Windows) vão junto: no Mac, botão direito
 no Bispo TV › Mostrar Conteúdo do Pacote › Contents › Resources › Licencas; no
 Windows, a pasta Licencas ao lado do programa.
@@ -142,6 +153,13 @@ if [ -d "$WIN" ]; then
     fi
     git push -q origin HEAD )
 fi
+if [ -d "$TV" ]; then
+  ( cd "$TV"
+    if ! git diff --quiet -- app/build.gradle.kts; then
+      git commit -q -m "Versão $versao" -- app/build.gradle.kts
+    fi
+    git push -q origin HEAD )
+fi
 
 # Com o remote "upstream" (o original, do sincronizar_original.sh) o gh não
 # sabe sozinho em qual repositório publicar: é sempre no origin.
@@ -154,7 +172,6 @@ gh release create "v$versao" --repo "$repo" \
   --notes-file "$notas" \
   $extra \
   build/release/BispoTv.dmg \
-  $(ls build/release/*.zip 2>/dev/null)
-  # Quando existirem os apps Android: $(ls build/release/*.apk 2>/dev/null)
+  $(ls build/release/*.zip build/release/*.apk 2>/dev/null)
 
 echo "pronto: https://github.com/$repo/releases/tag/v$versao"

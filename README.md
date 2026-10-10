@@ -7,11 +7,11 @@
 ### canais ao vivo, filmes e séries — na TV, no celular, no computador e no navegador
 
 <p>
-  <a href="https://github.com/gabrielsaimo/SaimoPlayer/releases/latest">
-    <img src="https://img.shields.io/github/v/release/gabrielsaimo/SaimoPlayer?label=vers%C3%A3o" alt="Versão">
+  <a href="https://github.com/fabianoobispo1/BispoTvPlayer/releases/latest">
+    <img src="https://img.shields.io/github/v/release/fabianoobispo1/BispoTvPlayer?label=vers%C3%A3o" alt="Versão">
   </a>
-  <a href="https://github.com/gabrielsaimo/SaimoPlayer/releases">
-    <img src="https://img.shields.io/github/downloads/gabrielsaimo/SaimoPlayer/total?label=downloads" alt="Downloads">
+  <a href="https://github.com/fabianoobispo1/BispoTvPlayer/releases">
+    <img src="https://img.shields.io/github/downloads/fabianoobispo1/BispoTvPlayer/total?label=downloads" alt="Downloads">
   </a>
 </p>
 
@@ -35,7 +35,7 @@ Este repositório é o centro do Saimo TV: o **app do Mac**, a **lista de canais
 o acervo publicados** (que todos os apps leem daqui), os scripts que mantêm esses
 dados e o **release único** que distribui todos os apps.
 
-Versão atual: **2.0.0** — [notas da versão](https://github.com/gabrielsaimo/SaimoPlayer/releases/tag/v2.0.0).
+Versão atual: **2.0.0** — [notas da versão](https://github.com/fabianoobispo1/BispoTvPlayer/releases/tag/v2.0.0).
 
 ## Os apps
 
@@ -48,7 +48,7 @@ Versão atual: **2.0.0** — [notas da versão](https://github.com/gabrielsaimo/
 | Navegador | [Saimo-TV](https://github.com/gabrielsaimo/Saimo-TV) | <https://saimo-tv.pages.dev> |
 
 Todos os arquivos saem juntos em
-[Releases](https://github.com/gabrielsaimo/SaimoPlayer/releases/latest), e cada
+[Releases](https://github.com/fabianoobispo1/BispoTvPlayer/releases/latest), e cada
 app procura a versão nova ali e se oferece para atualizar.
 
 ## O que todos têm

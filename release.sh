@@ -28,8 +28,10 @@ p = (sys.argv[1].split(".") + ["0", "0"])[:3]
 print(int(p[0]) * 10000 + int(p[1]) * 100 + int(p[2]))
 PY
 )
-  sed -i '' "s/versionName = \".*\"/versionName = \"$versao\"/" "$GRADLE"
-  sed -i '' "s/versionCode = .*/versionCode = $codigo/" "$GRADLE"
+  if [ -f "$GRADLE" ]; then
+    sed -i '' "s/versionName = \".*\"/versionName = \"$versao\"/" "$GRADLE"
+    sed -i '' "s/versionCode = .*/versionCode = $codigo/" "$GRADLE"
+  fi
   shift
 else
   versao=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
@@ -42,31 +44,35 @@ echo "==> montando o DMG"
 mkdir -p build/release
 cp "build/SaimoTV.dmg" "build/release/SaimoTV.dmg"
 
-echo "==> montando o APK da TV"
-# assembleRelease, e não Debug: o APK publicado sai assinado com a chave da
-# pasta chaves, que é o que permite atualizar por cima.
-( cd ../SaimoTV-Android && JAVA_HOME="$JAVA17" ANDROID_HOME="$HOME/Library/Android/sdk" \
-  ./gradlew assembleRelease -q )
-cp "../SaimoTV-Android/app/build/outputs/apk/release/app-release.apk" "build/release/SaimoTV.apk"
+# Os apps da TV e do Windows só entram quando os projetos estão ao lado deste.
+if [ -d ../SaimoTV-Android ]; then
+  echo "==> montando o APK da TV"
+  # assembleRelease, e não Debug: o APK publicado sai assinado com a chave da
+  # pasta chaves, que é o que permite atualizar por cima.
+  ( cd ../SaimoTV-Android && JAVA_HOME="$JAVA17" ANDROID_HOME="$HOME/Library/Android/sdk" \
+    ./gradlew assembleRelease -q )
+  cp "../SaimoTV-Android/app/build/outputs/apk/release/app-release.apk" "build/release/SaimoTV.apk"
+fi
 
-echo "==> montando o app do Windows"
-( cd ../SaimoWin && ./empacotar.sh >/dev/null )
-cp "../SaimoWin/dist/SaimoTV-Windows.zip" "build/release/SaimoTV-Windows.zip"
+if [ -d ../SaimoWin ]; then
+  echo "==> montando o app do Windows"
+  ( cd ../SaimoWin && ./empacotar.sh >/dev/null )
+  cp "../SaimoWin/dist/SaimoTV-Windows.zip" "build/release/SaimoTV-Windows.zip"
+fi
 
 # O APK do celular é montado à parte (Expo) e copiado para cá antes de publicar.
 if [ -f "../Saimo-Cell-V2/android/app/build/outputs/apk/release/app-release.apk" ]; then
   cp "../Saimo-Cell-V2/android/app/build/outputs/apk/release/app-release.apk" "build/release/SaimoCell.apk"
 fi
 
-echo "==> conferindo as assinaturas"
-APKSIGNER=$(ls "$HOME"/Library/Android/sdk/build-tools/*/apksigner | tail -1)
-for apk in build/release/*.apk; do
+if ls build/release/*.apk >/dev/null 2>&1; then
+  echo "==> conferindo as assinaturas"
+  APKSIGNER=$(ls "$HOME"/Library/Android/sdk/build-tools/*/apksigner | tail -1)
+  for apk in build/release/*.apk; do
   echo "    $(basename "$apk"): $("$APKSIGNER" verify --print-certs "$apk" 2>/dev/null \
     | grep -m1 -o 'SHA-256 digest: .*')"
-done
-
-cell=""
-[ -f "build/release/SaimoCell.apk" ] && cell="build/release/SaimoCell.apk"
+  done
+fi
 
 notas="build/release/NOTAS.md"
 if [ ! -f "$notas" ]; then
@@ -88,8 +94,7 @@ gh release create "v$versao" \
   --title "Saimo TV $versao" \
   --notes-file "$notas" \
   $extra \
-  build/release/SaimoTV.dmg build/release/SaimoTV.apk \
-  build/release/SaimoTV-Windows.zip \
-  ${cell:-}
+  build/release/SaimoTV.dmg \
+  $(ls build/release/*.apk build/release/*.zip 2>/dev/null)
 
-echo "pronto: https://github.com/gabrielsaimo/SaimoPlayer/releases/tag/v$versao"
+echo "pronto: https://github.com/fabianoobispo1/BispoTvPlayer/releases/tag/v$versao"

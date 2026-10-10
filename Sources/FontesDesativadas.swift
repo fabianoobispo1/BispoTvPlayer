@@ -1,12 +1,12 @@
 import Foundation
 import os
 
-/// Servidores desligados à mão, no painel do monitor.
+/// Servidores desligados à mão, em `fontes-desativadas.json` no repositório.
 ///
 /// Quando um provedor cai, cai inteiro: não é a fonte 3 de um canal que
 /// morreu, é o servidor que parou de responder para todo mundo. Editar o
 /// catálogo publicado a cada queda é lento e some com o link, que depois
-/// precisa voltar. Desligar o servidor no painel some com ele de todo canal e
+/// precisa voltar. Listar o servidor no arquivo some com ele de todo canal e
 /// de todo filme, em todos os aplicativos, e religar devolve tudo.
 ///
 /// A lista é baixada sem chave nenhuma: são nomes de servidor, que o catálogo
@@ -19,7 +19,7 @@ import os
 enum FontesDesativadas {
 
     private static let endereco = URL(
-        string: "https://saimo-monitor.gabrielsaimo68.workers.dev/v1/fontes")!
+        string: "https://raw.githubusercontent.com/fabianoobispo1/BispoTvPlayer/main/fontes-desativadas.json")!
     /// Desligar um servidor tem que valer em minutos, que é o tempo que alguém
     /// aguenta um canal quebrado.
     private static let validade: TimeInterval = 120

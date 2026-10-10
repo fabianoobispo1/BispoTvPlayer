@@ -16,7 +16,9 @@ final class Telemetria {
 
     enum Tipo: String { case live, vod }
 
-    private let base = URL(string: "https://saimo-monitor.gabrielsaimo68.workers.dev/v1")!
+    /// Endereço do monitor próprio (ex.: "https://meu-monitor.workers.dev/v1").
+    /// Vazio, nada é enviado.
+    private let base = URL(string: "")
     private let plataforma = "mac"
     /// Zapeando, cada canal que passa não vira batida: só quem ficou.
     private let minimoParaContar: TimeInterval = 20
@@ -244,6 +246,7 @@ final class Telemetria {
 
     private func enviar(_ rota: String, _ corpo: [String: Any], esperar: Bool = false,
                         resposta: (@MainActor @Sendable ([String: Any]?) -> Void)? = nil) {
+        guard let base else { return }
         var corpo = corpo
         corpo["deviceId"] = id
         corpo["platform"] = plataforma

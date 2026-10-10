@@ -31,7 +31,7 @@ final class Atualizacao: ObservableObject {
     /// estar atualizado não dá sinal nenhum na tela.
     @Published var aviso: String?
 
-    private let repo = "gabrielsaimo/SaimoPlayer"
+    private let repo = "fabianoobispo1/BispoTvPlayer"
     private let defaults = UserDefaults.standard
     private let chavePulada = "atualizacaoPulada"
     private let intervalo: UInt64 = 60 * 60

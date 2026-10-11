@@ -1,0 +1,57 @@
+name: Original mudou?
+
+# Uma vez por dia, pergunta ao repositório original se o código deste app mudou
+# desde o .upstream-base e conta para o Uptime Kuma (monitor do tipo Push):
+#   verde    — nada novo no código (mudança só de dados não conta)
+#   vermelho — o autor mexeu no app: hora de rodar ./sincronizar_original.sh
+#
+# O endereço do monitor fica no secret KUMA_PUSH_URL, no formato
+# https://kuma.fabianoobispo.com.br/api/push/<token>. Sem ele, o workflow só
+# mostra o resultado no log.
+on:
+  schedule:
+    - cron: "0 12 * * *"   # 9h em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Comparar com o original
+        id: checagem
+        run: |
+          saida="$(./sincronizar_original.sh --ver 2>&1)" || true
+          echo "$saida"
+          if echo "$saida" | grep -q "nada mudou"; then
+            echo "status=up" >> "$GITHUB_OUTPUT"
+            echo "msg=Sem mudanças no código do original" >> "$GITHUB_OUTPUT"
+          elif echo "$saida" | grep -q "commits do original"; then
+            n=$(echo "$saida" | grep -cE '^    [0-9a-f]{7} ')
+            echo "status=down" >> "$GITHUB_OUTPUT"
+            echo "msg=$n commit(s) novos no original: rode ./sincronizar_original.sh" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=down" >> "$GITHUB_OUTPUT"
+            echo "msg=A checagem falhou: veja o log do workflow" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Avisar o Kuma
+        env:
+          KUMA_PUSH_URL: ${{ secrets.KUMA_PUSH_URL }}
+          STATUS: ${{ steps.checagem.outputs.status }}
+          MSG: ${{ steps.checagem.outputs.msg }}
+        run: |
+          if [ -z "$KUMA_PUSH_URL" ]; then
+            echo "KUMA_PUSH_URL não configurado; resultado: $STATUS — $MSG"
+            exit 0
+          fi
+          curl -fsS -G "$KUMA_PUSH_URL" \
+            --data-urlencode "status=$STATUS" \
+            --data-urlencode "msg=$MSG" \
+            --data-urlencode "ping=" >/dev/null
+          echo "enviado: $STATUS — $MSG"

@@ -313,8 +313,23 @@ final class PlayerModel: NSObject, ObservableObject {
     func isFavorite(_ c: Channel) -> Bool { favorites.contains(c.source.absoluteString) }
 
     func toggleFavorite(_ c: Channel) {
+        let marcar = !isFavorite(c)
+        definirFavorito(c, marcado: marcar)
+        Sincronia.shared.favoritoCanal(c.name, marcado: marcar)
+    }
+
+    /// Sem avisar a sincronização: é ela quem chama, com o que veio da conta.
+    func definirFavorito(_ c: Channel, marcado: Bool) {
         let key = c.source.absoluteString
-        if favorites.contains(key) { favorites.remove(key) } else { favorites.insert(key) }
+        if marcado { favorites.insert(key) } else { favorites.remove(key) }
+        Store.setFavorites(favorites)
+    }
+
+    /// Os canais favoritos pelo nome, que é como a conta os guarda.
+    var nomesFavoritos: [String] { channels.filter { isFavorite($0) }.map(\.name) }
+
+    func esquecerFavoritos() {
+        favorites = []
         Store.setFavorites(favorites)
     }
 

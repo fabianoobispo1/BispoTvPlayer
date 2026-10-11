@@ -28,11 +28,13 @@ enum Progresso {
         let defaults = UserDefaults.standard
         guard posicao >= minimo, posicao <= duracao - sobra else {
             // Acabou de começar ou já terminou: nada a retomar.
-            defaults.removeObject(forKey: chaveBase + chave)
-            defaults.removeObject(forKey: chaveBase + chave + "|d")
-            defaults.removeObject(forKey: chaveBase + chave + "|t")
+            if defaults.object(forKey: chaveBase + chave) != nil {
+                apagar(chave)
+                Task { @MainActor in Sincronia.shared.progresso(chave, posicao: nil, duracao: nil) }
+            }
             return
         }
+        Task { @MainActor in Sincronia.shared.progresso(chave, posicao: posicao, duracao: duracao) }
         defaults.set(posicao, forKey: chaveBase + chave)
         defaults.set(duracao, forKey: chaveBase + chave + "|d")
         defaults.set(Date().timeIntervalSince1970, forKey: chaveBase + chave + "|t")
@@ -93,6 +95,33 @@ enum Progresso {
     }
 
     /// Quanto do título já foi visto, de 0 a 1, ou nil se nunca foi aberto.
+    // MARK: - Sincronização (vindo de outro aparelho; não avisa de volta)
+
+    static func aplicar(_ chave: String, posicao: Double, duracao: Double, quando: Double) {
+        let defaults = UserDefaults.standard
+        defaults.set(posicao, forKey: chaveBase + chave)
+        defaults.set(duracao, forKey: chaveBase + chave + "|d")
+        defaults.set(quando, forKey: chaveBase + chave + "|t")
+    }
+
+    static func apagar(_ chave: String) {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: chaveBase + chave)
+        defaults.removeObject(forKey: chaveBase + chave + "|d")
+        defaults.removeObject(forKey: chaveBase + chave + "|t")
+    }
+
+    static func duracao(_ chave: String) -> Double {
+        UserDefaults.standard.double(forKey: chaveBase + chave + "|d")
+    }
+
+    /// Ao sair da conta: o progresso era dela.
+    static func apagarTudo() {
+        for chave in UserDefaults.standard.dictionaryRepresentation().keys where chave.hasPrefix(chaveBase) {
+            UserDefaults.standard.removeObject(forKey: chave)
+        }
+    }
+
     static func fracao(_ chave: String) -> Double? {
         let posicao = UserDefaults.standard.double(forKey: chaveBase + chave)
         let duracao = UserDefaults.standard.double(forKey: chaveBase + chave + "|d")

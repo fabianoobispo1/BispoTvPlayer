@@ -41,6 +41,9 @@ final class Conta: ObservableObject {
 
     var logado: Bool { info != nil }
 
+    /// O token da sessão, para a sincronização falar com o servidor.
+    var tokenAtual: String? { token }
+
     // MARK: - Ações
 
     func cadastrar(email: String, senha: String, nome: String) async throws {
@@ -131,9 +134,15 @@ final class Conta: ObservableObject {
         } else {
             UserDefaults.standard.removeObject(forKey: chaveInfo)
         }
-        // O player só toca com alguém logado.
-        if entrou { PlayerModel.shared.abrirUltimoCanal() }
-        if saiu { PlayerModel.shared.pararTudo() }
+        // O player só toca com alguém logado; favoritos e progresso são da conta.
+        if entrou {
+            PlayerModel.shared.abrirUltimoCanal()
+            Task { await Sincronia.shared.sincronizar() }
+        }
+        if saiu {
+            PlayerModel.shared.pararTudo()
+            Sincronia.shared.esquecer()
+        }
     }
 }
 

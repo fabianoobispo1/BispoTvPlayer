@@ -1,15 +1,13 @@
 #!/bin/bash
 #
-# Publica uma versão: monta o DMG do Mac, o zip do Windows (de ../BispoTvWin) e
-# o APK da TV Box (de ../BispoTvAndroid), e sobe os três no mesmo release, com o
-# mesmo número.
+# Publica uma versão: monta o DMG do Mac, o zip do Windows (de ../BispoTvWin),
+# o APK da TV Box (de ../BispoTvAndroid) e o do celular (de ../BispoTvCell), e
+# sobe os quatro no mesmo release, com o mesmo número.
 #
 # A versão sai do Info.plist e é gravada também no Cargo.toml do Windows e no
-# Gradle da TV Box. O nome dos arquivos é o contrato com os atualizadores: o
-# Mac procura um .dmg, o Windows o BispoTv-Windows.zip, a TV Box o BispoTv.apk,
-# e o site linka os três.
-#
-# O trecho comentado monta o app do celular, que ainda não existe.
+# Gradle da TV Box e no app.json do celular. O nome dos arquivos é o contrato
+# com os atualizadores: o Mac procura um .dmg, o Windows o BispoTv-Windows.zip,
+# a TV Box o BispoTv.apk, o celular o BispoTvCell.apk, e o site linka os quatro.
 #
 #   ./release.sh                 usa a versão do Info.plist
 #   ./release.sh 1.1.0           marca esta versão antes de publicar
@@ -20,6 +18,7 @@ cd "$(dirname "$0")"
 PLIST="Info.plist"
 WIN="../BispoTvWin"
 TV="../BispoTvAndroid"
+CELL="../BispoTvCell"
 GRADLE="$TV/app/build.gradle.kts"
 JAVA17="/opt/homebrew/opt/openjdk@17"
 
@@ -75,10 +74,15 @@ else
   echo "aviso: $WIN não existe; o release sai só com o Mac" >&2
 fi
 
-# # O APK do celular é montado à parte (Expo) e copiado para cá antes de publicar.
-# if [ -f "../BispoTv-Cell/android/app/build/outputs/apk/release/app-release.apk" ]; then
-#   cp "../BispoTv-Cell/android/app/build/outputs/apk/release/app-release.apk" "build/release/BispoTvCell.apk"
-# fi
+# O celular também procura a versão nova neste release (BispoTvCell.apk). O
+# empacotar.sh dele grava a versão no app.json e sai com a chave de $CELL/chaves.
+if [ -d "$CELL" ]; then
+  echo "==> montando o APK do celular"
+  ( cd "$CELL" && ./empacotar.sh "$versao" >/dev/null )
+  cp "$CELL/build/BispoTvCell.apk" "build/release/BispoTvCell.apk"
+else
+  echo "aviso: $CELL não existe; o release sai sem o celular" >&2
+fi
 
 if ls build/release/*.apk >/dev/null 2>&1; then
   echo "==> conferindo as assinaturas"
@@ -128,6 +132,12 @@ notas="build/release/NOTAS.md"
    Opções do desenvolvedor › Instalar apps desconhecidos).
 3. No Downloader, digite `bispotv.pages.dev/tvbox` e instale o `BispoTv.apk`.
 
+**Celular e tablet Android** (Android 7 ou mais novo):
+
+1. No celular, abra `bispotv.pages.dev/celular` e baixe o `BispoTvCell.apk`.
+2. Abra o arquivo baixado e, se o Android pedir, permita instalar apps do
+   navegador.
+
 As licenças do FFmpeg (Mac) e do mpv (Windows) vão junto: no Mac, botão direito
 no Bispo TV › Mostrar Conteúdo do Pacote › Contents › Resources › Licencas; no
 Windows, a pasta Licencas ao lado do programa.
@@ -157,6 +167,13 @@ if [ -d "$TV" ]; then
   ( cd "$TV"
     if ! git diff --quiet -- app/build.gradle.kts; then
       git commit -q -m "Versão $versao" -- app/build.gradle.kts
+    fi
+    git push -q origin HEAD )
+fi
+if [ -d "$CELL" ]; then
+  ( cd "$CELL"
+    if ! git diff --quiet -- app.json package.json; then
+      git commit -q -m "Versão $versao" -- app.json package.json
     fi
     git push -q origin HEAD )
 fi

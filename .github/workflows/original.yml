@@ -50,7 +50,9 @@ jobs:
             echo "KUMA_PUSH_URL não configurado; resultado: $STATUS — $MSG"
             exit 0
           fi
-          curl -fsS -G "$KUMA_PUSH_URL" \
+          # O Kuma mostra o endereço com "?status=up&msg=OK&ping=" no fim: fica só a base.
+          base="${KUMA_PUSH_URL%%\?*}"
+          curl -fsS -G "$base" \
             --data-urlencode "status=$STATUS" \
             --data-urlencode "msg=$MSG" \
             --data-urlencode "ping=" >/dev/null

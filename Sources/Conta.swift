@@ -3,7 +3,7 @@ import Security
 
 /// A conta de quem usa o app.
 ///
-/// O login é obrigatório (cadastro aberto, por e-mail e senha) e é a mesma
+/// O login é obrigatório (conta nova pelo WhatsApp, entrar por e-mail e senha) e é a mesma
 /// conta do site, da TV Box e do Windows: o servidor é o BispoTvApi. O token
 /// da sessão fica no Chaveiro do macOS; sem rede, quem já entrou continua
 /// usando, e um token recusado pelo servidor (conta bloqueada, senha trocada
@@ -25,8 +25,16 @@ final class Conta: ObservableObject {
         var errorDescription: String? { mensagem }
     }
 
-    private let base = URL(string: "https://bispotv-api.fabianoobispo.com.br/v1/conta")!
-    private let chaveInfo = "conta.info"
+    /// O BispoTvApi. BISPOTV_API (ex.: http://localhost:8791/v1) aponta para
+    /// outro, para conferir telas: aí a sessão fica à parte da de verdade.
+    nonisolated static let api: URL = {
+        if let outro = ProcessInfo.processInfo.environment["BISPOTV_API"], let url = URL(string: outro) { return url }
+        return URL(string: "https://bispotv-api.fabianoobispo.com.br/v1")!
+    }()
+    nonisolated static let deTeste = ProcessInfo.processInfo.environment["BISPOTV_API"] != nil
+
+    private let base = Conta.api.appendingPathComponent("conta")
+    private let chaveInfo = Conta.deTeste ? "conta.info.teste" : "conta.info"
 
     @Published private(set) var info: Info?
     private var token: String?
@@ -45,10 +53,6 @@ final class Conta: ObservableObject {
     var tokenAtual: String? { token }
 
     // MARK: - Ações
-
-    func cadastrar(email: String, senha: String, nome: String) async throws {
-        try await abrirSessao("/cadastro", ["email": email, "senha": senha, "nome": nome])
-    }
 
     func entrar(email: String, senha: String) async throws {
         try await abrirSessao("/entrar", ["email": email, "senha": senha])
@@ -148,7 +152,7 @@ final class Conta: ObservableObject {
 
 /// O token da sessão no Chaveiro (item genérico deste app).
 private enum Chaveiro {
-    private static let servico = "dev.bispotv.player.sessao"
+    private static let servico = Conta.deTeste ? "dev.bispotv.player.sessao.teste" : "dev.bispotv.player.sessao"
 
     private static var consulta: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,

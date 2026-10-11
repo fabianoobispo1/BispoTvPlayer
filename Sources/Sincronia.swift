@@ -16,7 +16,7 @@ import Foundation
 final class Sincronia {
     static let shared = Sincronia()
 
-    private let endereco = URL(string: "https://bispotv-api.fabianoobispo.com.br/v1/sync")!
+    private let endereco = Conta.api.appendingPathComponent("sync")
     private let chaveEstado = "sincronia.estado"
 
     private struct Pendente: Codable {

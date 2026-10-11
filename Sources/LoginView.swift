@@ -104,36 +104,42 @@ private struct MensagemErro: View {
     }
 }
 
-struct LoginView: View {
-    private enum Modo: String, CaseIterable { case entrar = "Entrar", criar = "Criar conta" }
+/// Conta nova e senha esquecida são pelo WhatsApp (o robô do BispoTvApi). Os
+/// endereços passam pelo site, que redireciona: trocar o número não pede versão nova.
+private let pedirAcesso = URL(string: "https://bispotv.pages.dev/whatsapp")!
 
-    @State private var modo: Modo = .entrar
+struct LoginView: View {
     @State private var email = ""
     @State private var senha = ""
-    @State private var nome = ""
     @State private var erro: String?
     @State private var ocupado = false
+    @Environment(\.openURL) private var abrir
 
     var body: some View {
-        CartaoConta(titulo: modo == .criar ? "Criar conta" : "Entrar",
-                    subtitulo: modo == .criar ? "Grátis. A mesma conta vale no site, na TV Box, no Windows e no Mac."
-                                              : "Use a conta do Bispo TV para assistir.") {
-            Picker("", selection: $modo) {
-                ForEach(Modo.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .onChange(of: modo) { erro = nil }
-
-            if modo == .criar { Campo(rotulo: "Nome (opcional)", texto: $nome) }
+        CartaoConta(titulo: "Entrar",
+                    subtitulo: "A mesma conta vale no site, no celular, na TV Box, no Windows e no Mac.") {
             Campo(rotulo: "E-mail", texto: $email)
-            Campo(rotulo: "Senha", texto: $senha, segredo: true, dica: modo == .criar ? "Pelo menos 8 caracteres." : nil)
+            Campo(rotulo: "Senha", texto: $senha, segredo: true)
             if let erro { MensagemErro(texto: erro) }
-            BotaoPrincipal(titulo: modo == .criar ? "Criar conta" : "Entrar", ocupado: ocupado) { enviar() }
-            if modo == .entrar {
-                Text("Esqueceu a senha? Fale com quem administra o Bispo TV para receber uma senha temporária.")
-                    .font(.caption).foregroundStyle(.secondary)
+            BotaoPrincipal(titulo: "Entrar", ocupado: ocupado) { enviar() }
+            Text("Esqueceu a senha? [Mande SENHA no WhatsApp](https://bispotv.pages.dev/senha) e receba uma nova.")
+                .font(.caption).foregroundStyle(.secondary)
+            Divider().overlay(Tema.neutro800).padding(.top, 4)
+            VStack(spacing: 10) {
+                Text("Ainda não tem conta? O acesso é criado pelo WhatsApp, em um minuto.")
+                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Button { abrir(pedirAcesso) } label: {
+                    Label("Pedir acesso pelo WhatsApp", systemImage: "message")
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Tema.texto)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Tema.neutro800))
             }
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -143,9 +149,7 @@ struct LoginView: View {
         Task {
             defer { ocupado = false }
             do {
-                let e = email.trimmingCharacters(in: .whitespaces)
-                if modo == .criar { try await Conta.shared.cadastrar(email: e, senha: senha, nome: nome) }
-                else { try await Conta.shared.entrar(email: e, senha: senha) }
+                try await Conta.shared.entrar(email: email.trimmingCharacters(in: .whitespaces), senha: senha)
             } catch {
                 erro = error.localizedDescription
             }

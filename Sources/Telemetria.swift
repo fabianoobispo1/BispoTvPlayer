@@ -18,7 +18,7 @@ final class Telemetria {
 
     /// Endereço do monitor próprio (ex.: "https://meu-monitor.workers.dev/v1").
     /// Vazio, nada é enviado.
-    private let base = URL(string: "")
+    private let base = URL(string: "https://bispotv-api.fabianoobispo.com.br/v1")
     private let plataforma = "mac"
     /// Zapeando, cada canal que passa não vira batida: só quem ficou.
     private let minimoParaContar: TimeInterval = 20

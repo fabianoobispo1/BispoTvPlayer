@@ -196,7 +196,7 @@ struct ChannelRow: View {
             if isFavorite || hovering {
                 Button(action: toggleFavorite) {
                     Image(systemName: isFavorite ? "star.fill" : "star")
-                        .foregroundStyle(isFavorite ? .yellow : .secondary)
+                        .foregroundStyle(isFavorite ? Tema.acento : .secondary)
                 }
                 .buttonStyle(.plain)
             }
@@ -509,7 +509,7 @@ private struct NowPlayingStrip: View {
             .overlay(alignment: .bottomLeading) {
                 GeometryReader { geo in
                     Capsule()
-                        .fill(Color.red)
+                        .fill(Tema.acento)
                         .frame(width: geo.size.width * onAir.progress, height: 2)
                         .offset(y: geo.size.height - 2)
                 }
@@ -737,7 +737,7 @@ private struct LiveBadge: View {
         Button(action: model.jumpToLive) {
             HStack(spacing: 5) {
                 Circle()
-                    .fill(atLive ? Color.red : Color.secondary)
+                    .fill(atLive ? Tema.acento : Color.secondary)
                     .frame(width: 7, height: 7)
                 Text(atLive ? "AO VIVO" : "VOLTAR AO VIVO")
                     .font(.system(size: 10, weight: .bold))

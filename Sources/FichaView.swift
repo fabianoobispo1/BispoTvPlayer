@@ -178,7 +178,7 @@ struct FichaTela: View {
         if let ficha {
             HStack(spacing: 8) {
                 if ficha.nota > 0 {
-                    Selo(texto: String(format: "★ %.1f", ficha.nota), cor: .yellow)
+                    Selo(texto: String(format: "★ %.1f", ficha.nota), cor: Tema.acento300)
                 }
                 if !ficha.ano.isEmpty { Selo(texto: ficha.ano) }
                 if let minutos = ficha.duracao, minutos > 0 {

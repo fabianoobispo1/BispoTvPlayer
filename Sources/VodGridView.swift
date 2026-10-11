@@ -651,7 +651,7 @@ struct VodGridView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .padding(5)
                 .background(.black.opacity(0.45), in: Circle())
-                .foregroundStyle(marcado ? .yellow : .white.opacity(0.8))
+                .foregroundStyle(marcado ? Tema.acento300 : .white.opacity(0.8))
         }
         .buttonStyle(.plain)
         .padding(6)

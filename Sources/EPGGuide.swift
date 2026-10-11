@@ -59,7 +59,7 @@ struct EPGGuideView: View {
                 ProgressView().controlSize(.small)
                 Text("carregando…").font(.caption).foregroundStyle(.secondary)
             case .failed(let message):
-                Text(message).font(.caption).foregroundStyle(.red).lineLimit(1)
+                Text(message).font(.caption).foregroundStyle(Tema.erro).lineLimit(1)
             case .ready:
                 Text("\(epg.matchedChannels) canais com guia")
                     .font(.caption).foregroundStyle(.secondary)
@@ -246,7 +246,7 @@ struct EPGGuideView: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(.quaternary).frame(height: 3)
-                        Capsule().fill(Color.red)
+                        Capsule().fill(Tema.acento)
                             .frame(width: geo.size.width * programme.progress(at: now), height: 3)
                     }
                 }
@@ -271,7 +271,7 @@ struct EPGGuideView: View {
 
     private func nowLine(height: CGFloat) -> some View {
         Rectangle()
-            .fill(Color.red)
+            .fill(Tema.acento)
             .frame(width: 2, height: height)
             .offset(x: nowX)
             .allowsHitTesting(false)

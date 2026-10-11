@@ -54,7 +54,7 @@ struct VodGridView: View {
             // A régua só onde ela filtra alguma coisa: na tela inicial as
             // fileiras são curadoria, e peneirá-las deixa faixas com um cartão
             // ou nenhum.
-            if !Generos.todos.isEmpty, estado.secao != .inicio { reguaDeGeneros; Divider() }
+            if !Generos.todos.isEmpty, estado.secao != .inicio, estado.secao != .eventos { reguaDeGeneros; Divider() }
 
             conteudo
         }

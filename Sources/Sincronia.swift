@@ -117,6 +117,9 @@ final class Sincronia {
     /// Manda a fila e recebe o que mudou. Com uma em andamento, espera por
     /// ela e, sobrando algo na fila, manda de novo.
     func sincronizar() async {
+        // Conferindo telas com outra API (BISPOTV_API): nada de misturar os
+        // favoritos deste Mac com os da conta de teste.
+        guard !Conta.deTeste else { return }
         if let voo {
             await voo.value
             if estado.pendentes.isEmpty { return }
@@ -221,6 +224,7 @@ final class Sincronia {
 
     /// Ao sair da conta: favoritos e progresso eram dela, não deste Mac.
     func esquecer() {
+        guard !Conta.deTeste else { return }
         agendada?.cancel()
         agendada = nil
         estado = Estado()

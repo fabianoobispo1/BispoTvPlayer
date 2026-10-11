@@ -9,7 +9,16 @@ struct RaizView: View {
     var body: some View {
         Group {
             if let info = conta.info {
-                if info.trocarSenha { TrocarSenhaView() } else { ContentView() }
+                if info.trocarSenha {
+                    TrocarSenhaView()
+                } else {
+                    // Bispo TV: os avisos do painel numa faixa no topo da janela.
+                    VStack(spacing: 0) {
+                        FaixaDeAvisos()
+                        ContentView()
+                    }
+                    .onAppear { Avisos.shared.iniciar() }
+                }
             } else {
                 LoginView()
             }

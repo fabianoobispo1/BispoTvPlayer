@@ -82,6 +82,11 @@ struct BispoTvApp: App {
                 if let info = conta.info {
                     Text(info.email)
                     Divider()
+                    if info.whatsapp == true {
+                        Text("WhatsApp ligado")
+                    } else {
+                        Button("Ligar meu WhatsApp…") { Task { try? await conta.ligarWhatsapp() } }
+                    }
                     Button("Sair da conta") { Task { await conta.sair() } }
                 } else {
                     Text("Ninguém conectado")

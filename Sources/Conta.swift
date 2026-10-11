@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Security
 
@@ -17,6 +18,8 @@ final class Conta: ObservableObject {
         let email: String
         let nome: String?
         var trocarSenha: Bool
+        /// A conta tem um WhatsApp ligado (dá para resetar a senha pelo robô).
+        var whatsapp: Bool? = nil
     }
 
     struct Erro: LocalizedError {
@@ -69,6 +72,21 @@ final class Conta: ObservableObject {
     func sair() async {
         _ = try? await pedir("/sair", corpo: [:])
         gravar(token: nil, info: nil)
+    }
+
+    /// Ligar o WhatsApp à conta: gera o código e abre a conversa com
+    /// "VINCULAR <código>"; o robô liga o número de quem mandar.
+    func ligarWhatsapp() async throws {
+        let resposta = try await pedir("/whatsapp", corpo: [:])
+        guard let link = resposta["link"] as? String, let url = URL(string: link) else {
+            throw Erro(mensagem: "Resposta inesperada do servidor.", status: 0)
+        }
+        NSWorkspace.shared.open(url)
+        // Volta conferindo por um tempo, para o menu e o aviso saberem que ligou.
+        for _ in 0..<40 where info?.whatsapp != true {
+            try? await Task.sleep(for: .seconds(6))
+            await conferir()
+        }
     }
 
     /// Confere a sessão por trás, na abertura. Só um 401 tira a pessoa.
@@ -124,7 +142,8 @@ final class Conta: ObservableObject {
 
     private static func info(de valor: Any) -> Info? {
         guard let d = valor as? [String: Any], let id = d["id"] as? Int, let email = d["email"] as? String else { return nil }
-        return Info(id: id, email: email, nome: d["nome"] as? String, trocarSenha: d["trocarSenha"] as? Bool ?? false)
+        return Info(id: id, email: email, nome: d["nome"] as? String, trocarSenha: d["trocarSenha"] as? Bool ?? false,
+                    whatsapp: d["whatsapp"] as? Bool)
     }
 
     private func gravar(token novo: String?, info nova: Info?) {
@@ -152,7 +171,7 @@ final class Conta: ObservableObject {
 
 /// O token da sessão no Chaveiro (item genérico deste app).
 private enum Chaveiro {
-    private static let servico = Conta.deTeste ? "dev.bispotv.player.sessao.teste" : "dev.bispotv.player.sessao"
+    private static let servico = "dev.bispotv.player.sessao"
 
     private static var consulta: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
@@ -160,7 +179,12 @@ private enum Chaveiro {
          kSecAttrAccount as String: "token"]
     }
 
+    /// No modo de teste (BISPOTV_API) a sessão fica nas preferências: o
+    /// Chaveiro pediria a senha do Mac a cada build nova.
+    private static let chaveTeste = "sessao.teste"
+
     static func ler() -> String? {
+        if Conta.deTeste { return UserDefaults.standard.string(forKey: chaveTeste) }
         var q = consulta
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -170,6 +194,7 @@ private enum Chaveiro {
     }
 
     static func gravar(_ token: String) {
+        if Conta.deTeste { UserDefaults.standard.set(token, forKey: chaveTeste); return }
         apagar()
         var q = consulta
         q[kSecValueData as String] = Data(token.utf8)
@@ -178,6 +203,7 @@ private enum Chaveiro {
     }
 
     static func apagar() {
+        if Conta.deTeste { UserDefaults.standard.removeObject(forKey: chaveTeste); return }
         SecItemDelete(consulta as CFDictionary)
     }
 }

@@ -223,9 +223,9 @@ final class PlayerModel: NSObject, ObservableObject {
         applyVolume()
         observePlayer()
         setupRemoteCommands()
-        // Abre no canal que estava no ar quando o app fechou, como a TV.
-        let ultimo = UserDefaults.standard.string(forKey: "ultimoCanal")
-        selection = channels.first { $0.name == ultimo }?.id ?? channels.first?.id
+        // Abre no canal que estava no ar quando o app fechou, como a TV — mas
+        // só com alguém logado; senão espera a tela de entrar.
+        if Conta.shared.logado { abrirUltimoCanal() }
         EPGService.shared.load(channels: channels)
         refreshCatalog()
         vigiarFontesDesativadas()
@@ -629,6 +629,19 @@ final class PlayerModel: NSObject, ObservableObject {
             carregando: isPlaying && player.timeControlStatus != .playing,
             pulou: Date().timeIntervalSince(ultimoPulo) < 3,
             qualidade: altura > 0 ? "\(altura)p" : nil)
+    }
+
+    /// O canal que estava no ar quando o app fechou (ou o primeiro).
+    func abrirUltimoCanal() {
+        guard selection == nil else { return }
+        let ultimo = UserDefaults.standard.string(forKey: "ultimoCanal")
+        selection = channels.first { $0.name == ultimo }?.id ?? channels.first?.id
+    }
+
+    /// Ao sair da conta: nada toca por trás da tela de entrar.
+    func pararTudo() {
+        stop()
+        selection = nil
     }
 
     func stop() {

@@ -46,6 +46,9 @@ final class Telemetria {
         return novo
     }()
 
+    /// O mesmo id da telemetria, para ligar este Mac à conta no login.
+    var idDoAparelho: String { id }
+
     private var versao: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
     }

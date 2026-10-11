@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct BispoTvApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ObservedObject private var model = PlayerModel.shared
+    @ObservedObject private var conta = Conta.shared
 
     init() {
         do {
@@ -31,7 +32,7 @@ struct BispoTvApp: App {
 
     var body: some Scene {
         WindowGroup("Bispo TV") {
-            ContentView()
+            RaizView()
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
@@ -75,6 +76,16 @@ struct BispoTvApp: App {
                 Divider()
                 Button("Atualizar guia") { EPGService.shared.refresh(channels: model.channels) }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
+            }
+
+            CommandMenu("Conta") {
+                if let info = conta.info {
+                    Text(info.email)
+                    Divider()
+                    Button("Sair da conta") { Task { await conta.sair() } }
+                } else {
+                    Text("Ninguém conectado")
+                }
             }
 
             CommandMenu("Vídeo") {

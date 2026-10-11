@@ -19,19 +19,17 @@ let argumentos = CommandLine.arguments
 let saida = argumentos.count > 1 ? argumentos[1] : "dmg-fundo.png"
 let escala = argumentos.count > 2 ? CGFloat(Double(argumentos[2]) ?? 1) : 1
 
-// As mesmas cores do ícone.
-let fundo = NSColor(calibratedRed: 0.965, green: 0.969, blue: 0.976, alpha: 1)
-let marinho = NSColor(calibratedRed: 0.106, green: 0.176, blue: 0.365, alpha: 1)
-let cinza = NSColor(calibratedRed: 0.42, green: 0.45, blue: 0.53, alpha: 1)
-let turquesa = NSColor(calibratedRed: 0.40, green: 0.85, blue: 0.82, alpha: 1)
-let roxo = NSColor(calibratedRed: 0.52, green: 0.45, blue: 0.93, alpha: 1)
-let rosa = NSColor(calibratedRed: 0.86, green: 0.40, blue: 0.85, alpha: 1)
+// Cores do Nocturne (o tema do Bispo TV). O fundo fica claro de propósito: o
+// Finder escreve o nome dos ícones em preto, e num fundo escuro some.
+let fundo = NSColor(srgbRed: 0.953, green: 0.961, blue: 0.996, alpha: 1)   // neutro 100
+let marinho = NSColor(srgbRed: 0.086, green: 0.094, blue: 0.149, alpha: 1) // fundo do app
+let cinza = NSColor(srgbRed: 0.349, green: 0.365, blue: 0.424, alpha: 1)   // neutro 700
+let turquesa = NSColor(srgbRed: 0.475, green: 0.424, blue: 0.749, alpha: 1) // acento 600
+let roxo = NSColor(srgbRed: 0.569, green: 0.518, blue: 0.851, alpha: 1)    // acento
+let rosa = NSColor(srgbRed: 0.475, green: 0.424, blue: 0.749, alpha: 1)    // acento 600
 
 func fonte(_ tamanho: CGFloat, _ peso: NSFont.Weight) -> NSFont {
     let base = NSFont.systemFont(ofSize: tamanho, weight: peso)
-    if let d = base.fontDescriptor.withDesign(.rounded), let f = NSFont(descriptor: d, size: tamanho) {
-        return f
-    }
     return base
 }
 
@@ -63,7 +61,7 @@ NSRect(x: 0, y: 0, width: larguraTela, height: alturaTela).fill()
 NSGradient(colors: [turquesa, roxo, rosa])!
     .draw(in: NSRect(x: 0, y: y(6), width: larguraTela, height: 6), angle: 0)
 
-texto("Bispo TV", fonte(30, .bold), marinho, centroX: largura / 2, topo: 34)
+texto("Bispo TV", fonte(30, .semibold), marinho, centroX: largura / 2, topo: 34)
 texto("Arraste o Bispo TV para a pasta Aplicativos", fonte(15, .medium), cinza,
       centroX: largura / 2, topo: 76)
 

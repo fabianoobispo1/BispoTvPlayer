@@ -20,6 +20,8 @@ struct ChannelListView: View {
             Divider()
             lista
         }
+        // Nocturne: a lista no índigo do site, não no cinza translúcido do sistema.
+        .background(Tema.fundo)
     }
 
     private var acervo: some View {
@@ -41,7 +43,8 @@ struct ChannelListView: View {
                         .fontWeight(vod.secao == secao ? .semibold : .regular)
                         .padding(.vertical, 5)
                         .padding(.horizontal, 9)
-                        .background(vod.secao == secao ? Color.accentColor.opacity(0.25)
+                        .foregroundStyle(vod.secao == secao ? Tema.acento : .primary)
+                        .background(vod.secao == secao ? Tema.acento.opacity(0.14)
                                                        : Color.primary.opacity(0.06),
                                     in: RoundedRectangle(cornerRadius: 6))
                         .contentShape(Rectangle())
@@ -88,6 +91,7 @@ struct ChannelListView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
         .searchable(text: $model.search, placement: .sidebar, prompt: "Buscar canal")
         .toolbar {
             if showsAddMenu {

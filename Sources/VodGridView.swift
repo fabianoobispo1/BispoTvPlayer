@@ -58,7 +58,7 @@ struct VodGridView: View {
 
             conteudo
         }
-        .background(Color.black)
+        .background(FundoNocturne())
         .task { await abrir() }
         .onChange(of: estado.secao) { antiga, nova in
             // Busca é sempre sobre a seção aberta: carregar "mae" de Extras
@@ -121,7 +121,7 @@ struct VodGridView: View {
                                             Text(selo)
                                                 .font(.system(size: 10, weight: .bold))
                                                 .padding(.horizontal, 5).padding(.vertical, 1)
-                                                .background(Color.accentColor.opacity(0.85),
+                                                .background(Tema.acento.opacity(0.85),
                                                             in: Capsule())
                                         }
                                     }
@@ -203,9 +203,9 @@ struct VodGridView: View {
                         .padding(.vertical, 5)
                         .background(
                             Capsule().fill(estado.secao == secao
-                                           ? Color.accentColor.opacity(0.85)
-                                           : Color.white.opacity(0.10)))
-                        .foregroundStyle(estado.secao == secao ? .white : .primary)
+                                           ? Tema.acento.opacity(0.14)
+                                           : Color.white.opacity(0.06)))
+                        .foregroundStyle(estado.secao == secao ? Tema.acento : .primary)
                 }
                 .buttonStyle(.plain)
                 .help(secao.titulo)
@@ -247,9 +247,10 @@ struct VodGridView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(Capsule().fill(genero == valor
-                                           ? Color.accentColor.opacity(0.85)
-                                           : Color.white.opacity(0.10)))
-                .foregroundStyle(genero == valor ? .white : .primary)
+                                           ? Tema.acento.opacity(0.14)
+                                           : Color.white.opacity(0.06)))
+                .overlay(Capsule().strokeBorder(genero == valor ? Tema.acento : .clear, lineWidth: 1))
+                .foregroundStyle(genero == valor ? Tema.acento : .primary)
         }
         .buttonStyle(.plain)
     }
@@ -280,7 +281,7 @@ struct VodGridView: View {
                         .font(.system(size: 13, weight: estado.tudo ? .bold : .regular))
                         .padding(.vertical, 5)
                         .padding(.horizontal, 10)
-                        .background(estado.tudo ? Color.accentColor.opacity(0.35) : Color.white.opacity(0.06),
+                        .background(estado.tudo ? Tema.acento.opacity(0.18) : Color.white.opacity(0.06),
                                     in: RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
@@ -301,7 +302,7 @@ struct VodGridView: View {
                             .frame(minWidth: 26)
                             .padding(.vertical, 5)
                             .padding(.horizontal, 6)
-                            .background(ativa ? Color.accentColor.opacity(0.35) : Color.white.opacity(0.06),
+                            .background(ativa ? Tema.acento.opacity(0.18) : Color.white.opacity(0.06),
                                         in: RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
@@ -580,7 +581,7 @@ struct VodGridView: View {
                     // A barra vai na própria capa: é onde o olho já está.
                     ProgressView(value: visto)
                         .progressViewStyle(.linear)
-                        .tint(.accentColor)
+                        .tint(Tema.acento)
                         .padding(.horizontal, 6)
                         .padding(.bottom, 6)
                 }

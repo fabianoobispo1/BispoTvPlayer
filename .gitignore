@@ -2,10 +2,6 @@
 build/
 .build/
 
-# Ícone de origem opcional: cai para o desenhado quando ausente
-# (mantido fora do repositório por ser um asset grande e substituível)
-AppIcon.png
-
 .DS_Store
 
 # Caches locais dos geradores e relatórios reproduzíveis

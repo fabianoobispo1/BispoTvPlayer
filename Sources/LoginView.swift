@@ -15,6 +15,9 @@ struct RaizView: View {
             }
         }
         .task { await conta.conferir() }
+        // Nocturne: o roxo do Bispo TV no lugar do azul do sistema, em tudo.
+        .tint(Tema.acento)
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -26,25 +29,24 @@ private struct CartaoConta<Conteudo: View>: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 0.07, green: 0.05, blue: 0.14), Color(red: 0.04, green: 0.04, blue: 0.05)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                .ignoresSafeArea()
+            FundoNocturne()
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 12) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable().frame(width: 52, height: 52)
-                    Text("Bispo TV").font(.system(size: 22, weight: .bold))
+                    (Text("Bispo ") + Text("TV").foregroundColor(Tema.acento))
+                        .font(.system(size: 22, weight: .medium))
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(titulo).font(.system(size: 22, weight: .semibold))
+                    Text(titulo).font(.system(size: 22, weight: .medium))
                     Text(subtitulo).font(.callout).foregroundStyle(.secondary)
                 }
                 conteudo
             }
             .padding(28)
             .frame(width: 400)
-            .background(RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.09).opacity(0.92)))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08)))
+            .background(RoundedRectangle(cornerRadius: 14).fill(Tema.superficie))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Tema.neutro800))
         }
         .frame(minWidth: 520, minHeight: 560)
         .preferredColorScheme(.dark)
@@ -65,8 +67,8 @@ private struct Campo: View {
             }
             .textFieldStyle(.plain)
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 9).fill(Color.black.opacity(0.35)))
-            .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.12)))
+            .background(RoundedRectangle(cornerRadius: 8).fill(Tema.fundo))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Tema.neutro800))
             if let dica { Text(dica).font(.caption).foregroundStyle(.secondary) }
         }
     }
@@ -80,15 +82,11 @@ private struct BotaoPrincipal: View {
     var body: some View {
         Button(action: acao) {
             Text(ocupado ? "Aguarde…" : titulo)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 14, weight: .medium))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
-                .background(LinearGradient(colors: [Color(red: 0.55, green: 0.36, blue: 0.96), Color(red: 0.93, green: 0.28, blue: 0.6)],
-                                           startPoint: .leading, endPoint: .trailing))
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 11))
+                .padding(.vertical, 2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BotaoContornado())
         .keyboardShortcut(.defaultAction)
         .disabled(ocupado)
     }
@@ -99,7 +97,7 @@ private struct MensagemErro: View {
     var body: some View {
         Text(texto)
             .font(.callout)
-            .foregroundStyle(Color(red: 0.99, green: 0.65, blue: 0.69))
+            .foregroundStyle(Tema.erro)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 9).fill(Color.red.opacity(0.12)))

@@ -96,7 +96,7 @@ struct FichaTela: View {
                         Text(tipo)
                             .font(.system(size: 12, weight: .bold))
                             .tracking(2)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(Tema.acento)
                         Text(Generos.semAno(alvo.titulo))
                             .font(.system(size: 38, weight: .bold))
                             .lineLimit(2)
@@ -161,7 +161,7 @@ struct FichaTela: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.white.opacity(0.08))
             Text(String(alvo.titulo.prefix(1)).uppercased())
                 .font(.system(size: 60, weight: .semibold))
-                .foregroundStyle(Color.accentColor.opacity(0.7))
+                .foregroundStyle(Tema.acento.opacity(0.7))
             if let endereco, let url = URL(string: endereco) {
                 AsyncImage(url: url) { imagem in
                     imagem.resizable().aspectRatio(contentMode: .fill)
@@ -206,10 +206,11 @@ struct FichaTela: View {
                 Label(alvo.serie ? "Ver episódios"
                           : (andamento ?? 0) > 0 ? "Continuar" : "Assistir",
                       systemImage: "play.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 15, weight: .medium))
                     .padding(.horizontal, 26).padding(.vertical, 11)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 9))
-                    .foregroundStyle(.black)
+                    .background(Tema.acento.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Tema.acento, lineWidth: 1))
+                    .foregroundStyle(Tema.acento)
             }
             .buttonStyle(CresceNoFoco())
             .keyboardShortcut(.defaultAction)
@@ -217,10 +218,10 @@ struct FichaTela: View {
             Button { favoritos.alternar(item) } label: {
                 Label(marcado ? "Nos favoritos" : "Favoritar",
                       systemImage: marcado ? "star.fill" : "star")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 15, weight: .medium))
                     .padding(.horizontal, 20).padding(.vertical, 11)
-                    .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 9))
-                    .foregroundStyle(marcado ? .yellow : .white)
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Tema.divisor, lineWidth: 1))
+                    .foregroundStyle(marcado ? Tema.acento300 : Tema.texto)
             }
             .buttonStyle(CresceNoFoco())
         }
@@ -251,17 +252,8 @@ struct FichaTela: View {
         minutos < 60 ? "\(minutos) min" : "\(minutos / 60)h \(String(format: "%02d", minutos % 60))min"
     }
 
-    /// As cores da classificação indicativa brasileira, as mesmas do celular.
-    private func corDaClassificacao(_ nota: String) -> Color {
-        switch nota.uppercased() {
-        case "L": return Color(red: 0.06, green: 0.73, blue: 0.51)
-        case "10": return Color(red: 0.23, green: 0.51, blue: 0.96)
-        case "12": return Color(red: 0.96, green: 0.62, blue: 0.04)
-        case "14": return Color(red: 0.98, green: 0.45, blue: 0.09)
-        case "16", "18": return Color(red: 0.94, green: 0.27, blue: 0.27)
-        default: return .white.opacity(0.8)
-        }
-    }
+    /// Nocturne: a classificação é uma tag neutra, como no site e na TV Box.
+    private func corDaClassificacao(_ nota: String) -> Color { Tema.neutro300 }
 }
 
 // MARK: - Ator
@@ -293,7 +285,7 @@ struct AtorTela: View {
                         Text(perfil?.nome.isEmpty == false ? perfil!.nome : pessoa.nome)
                             .font(.system(size: 34, weight: .bold))
                         if let dados = perfil?.dados, !dados.isEmpty {
-                            Text(dados).font(.system(size: 14)).foregroundStyle(Color.accentColor)
+                            Text(dados).font(.system(size: 14)).foregroundStyle(Tema.acento)
                         }
                         if let bio = perfil?.biografia, !bio.isEmpty {
                             Text(bio)
@@ -330,7 +322,7 @@ struct AtorTela: View {
             .padding(.vertical, 26)
         }
         .background(
-            LinearGradient(colors: [Color(red: 0.05, green: 0.12, blue: 0.13), .black],
+            LinearGradient(colors: [Tema.secao, Tema.superficie],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea())
         .task(id: pessoa.id) {
@@ -443,7 +435,7 @@ private struct CapaDeTrabalho: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.08))
                 Text(String(trabalho.achado.titulo.prefix(1)).uppercased())
                     .font(.system(size: 34, weight: .semibold))
-                    .foregroundStyle(Color.accentColor.opacity(0.7))
+                    .foregroundStyle(Tema.acento.opacity(0.7))
                 if let endereco = trabalho.capa, let url = URL(string: endereco) {
                     AsyncImage(url: url) { imagem in
                         imagem.resizable().aspectRatio(contentMode: .fill)

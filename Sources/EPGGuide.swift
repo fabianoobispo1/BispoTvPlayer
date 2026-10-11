@@ -192,10 +192,10 @@ struct EPGGuideView: View {
         .padding(.horizontal, 12)
         .contentShape(Rectangle())
         .onTapGesture {
-            model.selection = channel.id
+            model.escolherNaLista(channel.id)
             dismiss()
         }
-        .background(model.selection == channel.id
+        .background(model.selecaoDaLista == channel.id
                     ? Tema.acento.opacity(0.18) : Color.clear)
     }
 

@@ -67,11 +67,16 @@ O `release.sh` faz o push; não precisa ter nada pendente além disso.
 ./release.sh 2.1.2 --rascunho     # ou como rascunho, para revisar no site antes
 ```
 
-O script grava a versão no `Info.plist`, no `Cargo.toml` do Windows e no Gradle
-da TV Box, monta o DMG (com o ffmpeg e as licenças), o zip do Windows (com o
-mpv e as licenças) e o APK (assinado com a sua chave), commita a versão nova e
-dá push nos três repositórios, e cria o release `v2.1.2` com os três arquivos e
-as notas. Se `../BispoTvWin` ou `../BispoTvAndroid` não existir, ele avisa e
+O script grava a versão no `Info.plist`, no `Cargo.toml` do Windows, no Gradle
+da TV Box e no `app.json`/`package.json` do celular, monta o DMG (com o ffmpeg
+e as licenças), o zip do Windows (com o mpv e as licenças) e os dois APKs (TV
+Box e celular, assinados com as chaves próprias), commita a versão nova e dá
+push nos quatro repositórios, e cria o release `v2.1.2` com os quatro arquivos
+e as notas.
+
+Ele monta **a pasta como está**, mas só commita os arquivos de versão: antes de
+rodar, deixe `git status` limpo nos quatro apps. Mudança pendente iria para os
+usuários sem estar no Git. Se `../BispoTvWin` ou `../BispoTvAndroid` não existir, ele avisa e
 publica sem aquele app — evite: cada app procura a versão nova no mesmo
 release e ofereceria um download que não existe. Para notas
 próprias, escreva um `NOTAS.md` na raiz antes; sem ele, entram os commits desde
@@ -94,7 +99,8 @@ Para ele funcionar:
 - o número tem que ser maior que o do app instalado (compara parte por parte:
   `2.10.0` é mais novo que `2.9.3`);
 - o release tem que ter o `BispoTv.dmg` (Mac), o `BispoTv-Windows.zip`
-  (Windows) e o `BispoTv.apk` (TV Box), com exatamente esses nomes;
+  (Windows), o `BispoTv.apk` (TV Box) e o `BispoTvCell.apk` (celular), com
+  exatamente esses nomes;
 - rascunhos e pré-lançamentos não contam como "último release".
 
 ## Problemas comuns
@@ -107,6 +113,8 @@ Para ele funcionar:
 | `gh: command not found` ou `not logged in` | `brew install gh && gh auth login`. |
 | `No default remote repository has been set` | Versões antigas do `release.sh` não diziam ao `gh` qual repositório usar (há dois remotes: `origin` e `upstream`). O script atual já passa `--repo`; se precisar, rode `gh repo set-default fabianoobispo1/BispoTvPlayer`. |
 | `release ... already exists` | Essa versão já foi publicada. Use um número novo. |
+| `HTTP 500 (https://api.github.com/repos/.../releases)` e um link `untagged-...` | Instabilidade do GitHub ao criar o release. Os pushes já foram feitos e pode ter ficado um **rascunho vazio** (rascunho não conta como último release: ninguém é afetado). Não rode o script de novo; anexe os arquivos de `build/release/` ao rascunho e publique: `gh release upload v2.1.2 --repo fabianoobispo1/BispoTvPlayer build/release/BispoTv.dmg build/release/BispoTv-Windows.zip build/release/BispoTv.apk build/release/BispoTvCell.apk && gh release edit v2.1.2 --repo fabianoobispo1/BispoTvPlayer --draft=false --latest`. Confira com `gh release view v2.1.2`. |
+| `npm ci` can only install packages when your package.json and package-lock.json are in sync (no APK do celular) | O `package-lock.json` do `BispoTvCell` não bate com o `package.json`, em geral depois de uma mescla com o original. Para a versão, troque só as duas linhas do topo do lock; se o lock se perdeu, parta do original (`git show upstream/main:package-lock.json`) e confira com `npm ci --dry-run --ignore-scripts`. O release para antes de publicar: corrija, commite e rode de novo com o mesmo número. |
 | Quem baixa vê "não é possível verificar o desenvolvedor" | Normal: o app não é assinado pela Apple. As notas do release explicam o "Abrir Mesmo Assim". Para sumir com o aviso, é preciso a conta de desenvolvedor da Apple (assinatura + notarização). |
 
 ## Métricas

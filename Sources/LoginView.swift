@@ -122,9 +122,55 @@ struct LoginView: View {
     @State private var senha = ""
     @State private var erro: String?
     @State private var ocupado = false
+    /// Conta no limite: os aparelhos para escolher qual sai.
+    @State private var cheia: [Conta.Aparelho] = []
     @Environment(\.openURL) private var abrir
 
     var body: some View {
+        if cheia.isEmpty { formulario } else { escolherAparelho }
+    }
+
+    private var escolherAparelho: some View {
+        CartaoConta(titulo: "Limite de aparelhos",
+                    subtitulo: "Esta conta já está no limite de aparelhos. Escolha qual desconectar para entrar aqui; ele precisará entrar de novo para usar.") {
+            ForEach(cheia) { a in
+                HStack(spacing: 12) {
+                    Image(systemName: Self.icones[a.plataforma] ?? "display")
+                        .font(.system(size: 20)).foregroundStyle(Tema.acento).frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(a.nome).font(.system(size: 14, weight: .medium))
+                        Text("Usado \(Self.haQuanto(a.usadoEm))").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Desconectar") { enviar(desconectar: a.id) }
+                        .buttonStyle(BotaoContornado())
+                        .disabled(ocupado)
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Tema.fundo))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Tema.neutro800))
+            }
+            if let erro { MensagemErro(texto: erro) }
+            Button("Voltar") { cheia = []; erro = nil }
+                .buttonStyle(.link)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private static let icones = ["tvbox": "tv", "windows": "pc", "mac": "laptopcomputer", "cell": "iphone", "site": "globe"]
+
+    private static func haQuanto(_ data: Date?) -> String {
+        guard let data else { return "há algum tempo" }
+        let min = max(0, Int(Date().timeIntervalSince(data) / 60))
+        switch min {
+        case ..<5: return "agora há pouco"
+        case ..<60: return "há \(min) min"
+        case ..<2880: return "há \(min / 60) h"
+        default: return "há \(min / 1440) dias"
+        }
+    }
+
+    private var formulario: some View {
         CartaoConta(titulo: "Entrar",
                     subtitulo: "A mesma conta vale no site, no celular, na TV Box, no Windows e no Mac.") {
             Campo(rotulo: "E-mail", texto: $email)
@@ -152,13 +198,16 @@ struct LoginView: View {
         }
     }
 
-    private func enviar() {
+    private func enviar(desconectar: Int? = nil) {
         erro = nil
         ocupado = true
         Task {
             defer { ocupado = false }
             do {
-                try await Conta.shared.entrar(email: email.trimmingCharacters(in: .whitespaces), senha: senha)
+                try await Conta.shared.entrar(email: email.trimmingCharacters(in: .whitespaces), senha: senha, desconectar: desconectar)
+                cheia = []
+            } catch let falha as Conta.Erro where !falha.aparelhos.isEmpty {
+                cheia = falha.aparelhos
             } catch {
                 erro = error.localizedDescription
             }

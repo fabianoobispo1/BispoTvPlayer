@@ -25,7 +25,17 @@ final class Conta: ObservableObject {
     struct Erro: LocalizedError {
         let mensagem: String
         let status: Int
+        /// 409: a conta já está no limite; a pessoa escolhe um destes para sair.
+        var aparelhos: [Aparelho] = []
         var errorDescription: String? { mensagem }
+    }
+
+    /// Um aparelho conectado à conta (a lista vem quando ela está cheia).
+    struct Aparelho: Identifiable, Equatable {
+        let id: Int
+        let nome: String
+        let plataforma: String
+        let usadoEm: Date?
     }
 
     /// O BispoTvApi. BISPOTV_API (ex.: http://localhost:8791/v1) aponta para
@@ -57,8 +67,11 @@ final class Conta: ObservableObject {
 
     // MARK: - Ações
 
-    func entrar(email: String, senha: String) async throws {
-        try await abrirSessao("/entrar", ["email": email, "senha": senha])
+    /// `desconectar`: o aparelho escolhido para sair quando a conta está cheia.
+    func entrar(email: String, senha: String, desconectar: Int? = nil) async throws {
+        var campos: [String: Any] = ["email": email, "senha": senha]
+        if let desconectar { campos["desconectar"] = desconectar }
+        try await abrirSessao("/entrar", campos)
     }
 
     func trocarSenha(atual: String, nova: String) async throws {
@@ -104,7 +117,7 @@ final class Conta: ObservableObject {
 
     // MARK: - Servidor
 
-    private func abrirSessao(_ caminho: String, _ campos: [String: String]) async throws {
+    private func abrirSessao(_ caminho: String, _ campos: [String: Any]) async throws {
         var corpo: [String: Any] = campos
         corpo["deviceId"] = Telemetria.shared.idDoAparelho
         corpo["platform"] = "mac"
@@ -135,9 +148,20 @@ final class Conta: ObservableObject {
         let status = (resposta as? HTTPURLResponse)?.statusCode ?? 0
         let json = (try? JSONSerialization.jsonObject(with: dados)) as? [String: Any] ?? [:]
         guard (200...299).contains(status) else {
-            throw Erro(mensagem: json["erro"] as? String ?? "Não deu certo. Tente de novo.", status: status)
+            throw Erro(mensagem: json["erro"] as? String ?? "Não deu certo. Tente de novo.", status: status,
+                       aparelhos: status == 409 ? Self.aparelhos(de: json["aparelhos"]) : [])
         }
         return json
+    }
+
+    private static func aparelhos(de valor: Any?) -> [Aparelho] {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return (valor as? [[String: Any]] ?? []).compactMap { a in
+            guard let id = a["id"] as? Int else { return nil }
+            return Aparelho(id: id, nome: a["nome"] as? String ?? "Aparelho", plataforma: a["plataforma"] as? String ?? "",
+                            usadoEm: (a["usadoEm"] as? String).flatMap(iso.date(from:)))
+        }
     }
 
     private static func info(de valor: Any) -> Info? {

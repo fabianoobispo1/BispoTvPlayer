@@ -160,9 +160,12 @@ final class Sincronia {
 
         defer { agendar(estado.pendentes.isEmpty ? 300 : 15) }
         guard let (dados, resposta) = try? await URLSession.shared.data(for: pedido),
-              (resposta as? HTTPURLResponse)?.statusCode == 200,
               let corpo = try? JSONSerialization.jsonObject(with: dados) as? [String: Any]
         else { return } // sem rede: a fila espera a próxima vez
+        if let situacao = corpo["situacao"] as? String {
+            Conta.shared.atualizarSituacao(situacao)
+        }
+        guard (resposta as? HTTPURLResponse)?.statusCode == 200 else { return }
 
         let mandados = Set(enviados.map { "\($0.tipo)|\($0.chave)|\($0.alteradoEm)" })
         estado.pendentes.removeAll { mandados.contains("\($0.tipo)|\($0.chave)|\($0.alteradoEm)") }

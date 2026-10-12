@@ -9,7 +9,9 @@ struct RaizView: View {
     var body: some View {
         Group {
             if let info = conta.info {
-                if info.trocarSenha {
+                if info.situacao == "bloqueada" {
+                    RenovarAssinaturaView()
+                } else if info.trocarSenha {
                     TrocarSenhaView()
                 } else {
                     // Bispo TV: os avisos do painel numa faixa no topo da janela.
@@ -27,6 +29,28 @@ struct RaizView: View {
         // Nocturne: o roxo do Bispo TV no lugar do azul do sistema, em tudo.
         .tint(Tema.acento)
         .preferredColorScheme(.dark)
+    }
+}
+
+private struct RenovarAssinaturaView: View {
+    @Environment(\.openURL) private var abrir
+    private let assinar = URL(string: "https://bispotv.pages.dev/assinar")!
+
+    var body: some View {
+        FundoNocturne()
+            .overlay {
+                VStack(spacing: 16) {
+                    Text("Conta bloqueada").font(.title2.weight(.medium))
+                    Text("Renove em bispotv.pages.dev/assinar")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button("Abrir página de renovação") { abrir(assinar) }
+                        .buttonStyle(BotaoContornado())
+                    Button("Sair da conta") { Task { await Conta.shared.sair() } }
+                        .buttonStyle(.link)
+                }
+                .padding(32)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Tema.superficie))
+            }
     }
 }
 
@@ -122,12 +146,15 @@ struct LoginView: View {
     @State private var senha = ""
     @State private var erro: String?
     @State private var ocupado = false
+    @State private var assinaturaBloqueada = false
     /// Conta no limite: os aparelhos para escolher qual sai.
     @State private var cheia: [Conta.Aparelho] = []
     @Environment(\.openURL) private var abrir
 
     var body: some View {
-        if cheia.isEmpty { formulario } else { escolherAparelho }
+        if assinaturaBloqueada { RenovarAssinaturaView() }
+        else if cheia.isEmpty { formulario }
+        else { escolherAparelho }
     }
 
     private var escolherAparelho: some View {
@@ -208,6 +235,8 @@ struct LoginView: View {
                 cheia = []
             } catch let falha as Conta.Erro where !falha.aparelhos.isEmpty {
                 cheia = falha.aparelhos
+            } catch let falha as Conta.Erro where falha.status == 403 && falha.situacao == "bloqueada" {
+                assinaturaBloqueada = true
             } catch {
                 erro = error.localizedDescription
             }

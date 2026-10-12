@@ -20,6 +20,9 @@ final class Conta: ObservableObject {
         var trocarSenha: Bool
         /// A conta tem um WhatsApp ligado (dá para resetar a senha pelo robô).
         var whatsapp: Bool? = nil
+        var plano: String? = nil
+        var pagoAte: String? = nil
+        var situacao: String? = nil
     }
 
     struct Erro: LocalizedError {
@@ -27,6 +30,7 @@ final class Conta: ObservableObject {
         let status: Int
         /// 409: a conta já está no limite; a pessoa escolhe um destes para sair.
         var aparelhos: [Aparelho] = []
+        var situacao: String? = nil
         var errorDescription: String? { mensagem }
     }
 
@@ -64,6 +68,13 @@ final class Conta: ObservableObject {
 
     /// O token da sessão, para a sincronização falar com o servidor.
     var tokenAtual: String? { token }
+
+    func atualizarSituacao(_ situacao: String) {
+        guard var info, info.situacao != situacao else { return }
+        info.situacao = situacao
+        gravar(token: token, info: info)
+        if situacao == "bloqueada" { PlayerModel.shared.pararTudo() }
+    }
 
     // MARK: - Ações
 
@@ -108,6 +119,8 @@ final class Conta: ObservableObject {
         do {
             let resposta = try await pedir("/eu")
             if let conta = resposta["conta"], let i = Self.info(de: conta) { gravar(token: token, info: i) }
+        } catch let erro as Erro where erro.status == 403 && erro.situacao == "bloqueada" {
+            atualizarSituacao("bloqueada")
         } catch let erro as Erro where erro.status == 401 {
             gravar(token: nil, info: nil)
         } catch {
@@ -149,7 +162,8 @@ final class Conta: ObservableObject {
         let json = (try? JSONSerialization.jsonObject(with: dados)) as? [String: Any] ?? [:]
         guard (200...299).contains(status) else {
             throw Erro(mensagem: json["erro"] as? String ?? "Não deu certo. Tente de novo.", status: status,
-                       aparelhos: status == 409 ? Self.aparelhos(de: json["aparelhos"]) : [])
+                       aparelhos: status == 409 ? Self.aparelhos(de: json["aparelhos"]) : [],
+                       situacao: json["situacao"] as? String)
         }
         return json
     }
@@ -167,7 +181,8 @@ final class Conta: ObservableObject {
     private static func info(de valor: Any) -> Info? {
         guard let d = valor as? [String: Any], let id = d["id"] as? Int, let email = d["email"] as? String else { return nil }
         return Info(id: id, email: email, nome: d["nome"] as? String, trocarSenha: d["trocarSenha"] as? Bool ?? false,
-                    whatsapp: d["whatsapp"] as? Bool)
+                    whatsapp: d["whatsapp"] as? Bool, plano: d["plano"] as? String, pagoAte: d["pagoAte"] as? String,
+                    situacao: d["situacao"] as? String)
     }
 
     private func gravar(token novo: String?, info nova: Info?) {

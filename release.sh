@@ -120,8 +120,8 @@ notas="build/release/NOTAS.md"
 
 1. Baixe o `BispoTv-Windows.zip` abaixo, clique com o botão direito nele e
    escolha **Extrair Tudo...**.
-2. Abra o **Bispo TV.exe** de dentro da pasta extraída (a `libmpv-2.dll` precisa
-   ficar ao lado dele).
+2. Abra o **Bispo TV.exe** de dentro da pasta extraída (a `libmpv-2.dll` e a
+   `vulkan-1.dll` precisam ficar ao lado dele).
 3. Se o Windows Defender avisar, clique em **Mais informações** e depois em
    **Executar assim mesmo**: o app não tem assinatura paga da Microsoft.
 

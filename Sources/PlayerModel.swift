@@ -42,6 +42,9 @@ final class PlayerModel: NSObject, ObservableObject {
     @Published var generatedLink: URL?
     @Published var volume: Double = 1.0 { didSet { applyVolume() } }
     @Published var isMuted = false { didSet { applyVolume() } }
+    /// Sem som enquanto a abertura do app está na tela: o último canal já
+    /// abre por baixo dela. Não é guardado, ao contrário do mudo.
+    var silenciadoPelaAbertura = false { didSet { applyVolume() } }
     @Published var rate: Float = 1.0 { didSet { if isPlaying { player.rate = rate } } }
     @Published var fillScreen = false
     @Published var isPiPActive = false
@@ -51,7 +54,9 @@ final class PlayerModel: NSObject, ObservableObject {
     @Published var showLog = false
     @Published var showGuide = false
     /// Channel list living in its own window pinned to the player.
-    @Published var detachedList = true
+    /// A lista de canais numa janela à parte, ao lado do player. A lista de
+    /// sempre agora é a de vidro, dentro da janela (`PainelDeCanais`).
+    @Published var detachedList = false
     @Published var stats = PlaybackStats()
 
     /// Qual das fontes do canal está no ar, e se ela ainda está carregando.
@@ -194,6 +199,8 @@ final class PlayerModel: NSObject, ObservableObject {
     private var fileSourceIndex = 0
     /// Se a fonte atual já foi tentada pelo atalho local.
     private var fonteViaProxy = false
+    /// A fonte em que a série no ar vem tocando; vale só para esta sessão.
+    private var fontePreferida: FontePreferida.Memoria?
 
     /// Um master HLS publicado como `.txt` precisa passar pelo proxy de
     /// playlists desde o primeiro pedido. Servi-lo direto faz o AVFoundation
@@ -388,6 +395,7 @@ final class PlayerModel: NSObject, ObservableObject {
         guardarProgresso(forcado: true)
         UserDefaults.standard.set(channel.name, forKey: "ultimoCanal")
         episodioNoAr = nil
+        fontePreferida = nil
         painelEpisodios = false
         marcas = nil
         zerarLegendasExternas()
@@ -428,6 +436,8 @@ final class PlayerModel: NSObject, ObservableObject {
         aoVivoPendente = false
         episodioNoAr = episodioPendente
         episodioPendente = nil
+        // Outra série (ou um filme): a fonte lembrada deixa de valer.
+        if fontePreferida?.serie != episodioNoAr?.serie { fontePreferida = nil }
         marcas = nil
         proximoDesde = nil
         proximoDispensado = false
@@ -542,7 +552,11 @@ final class PlayerModel: NSObject, ObservableObject {
         isPlaying = true
         startTimers()
         loadMediaOptions(for: asset, item: item)
-        if let channel { updateNowPlaying(channel: channel) }
+        if let channel {
+            TocandoAgora.shared.aoVivo(channel)
+        } else {
+            TocandoAgora.shared.arquivo(nome: playingFileName, episodio: episodioNoAr)
+        }
         preventSleep(true)
     }
 
@@ -610,12 +624,39 @@ final class PlayerModel: NSObject, ObservableObject {
     func tocarEpisodio(_ escolhido: Episodio) {
         guard let ep = episodioNoAr else { return }
         let rotulo = escolhido.versao == "leg" ? "Legendado" : "Dublado"
+        let urls = fontesPreferidas(serie: ep.serie, urls: escolhido.urls)
         episodioPendente = EpisodioNoAr(serie: ep.serie, temporada: escolhido.temporada,
                                         numero: escolhido.numero, versao: escolhido.versao, lista: ep.lista)
-        playFile(escolhido.urls.compactMap(URL.init(string:)), nome: ep.serie,
+        playFile(urls.compactMap(URL.init(string:)), nome: ep.serie,
                  detalhe: "Temporada \(escolhido.temporada), episódio \(escolhido.numero) · \(rotulo)",
                  chave: Progresso.chaveEpisodio(ep.serie, escolhido.temporada, escolhido.numero))
     }
+
+    /// Guarda a fonte que está de fato no ar (a escolhida, a de fábrica ou a
+    /// que o player desceu sozinho) como a preferida para o resto da série.
+    private func lembrarFonteNoAr() {
+        guard let ep = episodioNoAr, playingFile != nil,
+              fileSources.indices.contains(fileSourceIndex) else { return }
+        let url = fileSources[fileSourceIndex].absoluteString
+        // A posição é na lista do próprio episódio, não na que foi reordenada.
+        let doEpisodio = ep.lista.first {
+            $0.temporada == ep.temporada && $0.numero == ep.numero && $0.versao == ep.versao
+        }?.urls ?? []
+        let posicao = doEpisodio.firstIndex { URL(string: $0)?.absoluteString == url } ?? fileSourceIndex
+        fontePreferida = FontePreferida.Memoria(
+            serie: ep.serie, host: FontePreferida.host(de: url), posicao: posicao)
+    }
+
+    /// As fontes do próximo episódio da série no ar, com a de sempre na frente.
+    /// Sem nada lembrado (ou noutra série), devolve a lista como veio.
+    func fontesPreferidas(serie: String, urls: [String]) -> [String] {
+        if episodioNoAr?.serie == serie { lembrarFonteNoAr() }
+        guard let m = fontePreferida, m.serie == serie else { return urls }
+        return FontePreferida.ordenar(urls, host: m.host, posicao: m.posicao)
+    }
+
+    /// Se há fonte lembrada para esta série.
+    func fonteLembrada(_ serie: String) -> Bool { fontePreferida?.serie == serie }
 
     /// A cada volta do relógio: sobe o cartão nos créditos e segue sozinho.
     private func acompanharEpisodio() {
@@ -664,6 +705,7 @@ final class PlayerModel: NSObject, ObservableObject {
             play()
         }
         contarVideo()
+        avisarTocandoAgora()
     }
 
     /// O monitor só conta o tempo com o vídeo andando de verdade.
@@ -699,6 +741,7 @@ final class PlayerModel: NSObject, ObservableObject {
         isPlaying = false
         status = "parado"
         preventSleep(false)
+        TocandoAgora.shared.limpar()
     }
 
     func reload() {
@@ -864,6 +907,7 @@ final class PlayerModel: NSObject, ObservableObject {
         position = seconds
         ultimoPulo = Date()
         player.seek(to: alvo, toleranceBefore: .zero, toleranceAfter: .zero)
+        avisarTocandoAgora()
     }
 
     // MARK: - Timers
@@ -924,6 +968,7 @@ final class PlayerModel: NSObject, ObservableObject {
             guardarProgresso()
             acompanharEpisodio()
         }
+        avisarTocandoAgora()
         // presentationSize only fires once the first frame is decoded, and the
         // KVO can land before the layer is ready, so re-read it each tick.
         let size = item.presentationSize
@@ -1286,8 +1331,9 @@ final class PlayerModel: NSObject, ObservableObject {
         // canal, o som continua com a principal.
         let somNaSegunda = multiTela && segundaAtiva && segunda.canal != nil
         player.volume = Float(volume)
-        player.isMuted = isMuted || somNaSegunda
-        segunda.aplicarSom(volume: volume, mudo: isMuted || !somNaSegunda)
+        let mudo = isMuted || silenciadoPelaAbertura
+        player.isMuted = mudo || somNaSegunda
+        segunda.aplicarSom(volume: volume, mudo: mudo || !somNaSegunda)
         Store.setVolume(volume)
     }
 
@@ -1321,6 +1367,20 @@ final class PlayerModel: NSObject, ObservableObject {
         c.pauseCommand.addTarget { [weak self] _ in
             Task { @MainActor in if self?.isPlaying == true { self?.togglePlayPause() } }; return .success
         }
+        // Só no filme e no episódio: o TocandoAgora desliga estes no ao vivo.
+        c.changePlaybackPositionCommand.addTarget { [weak self] evento in
+            guard let alvo = (evento as? MPChangePlaybackPositionCommandEvent)?.positionTime
+            else { return .commandFailed }
+            Task { @MainActor in self?.seek(to: alvo) }; return .success
+        }
+        c.skipForwardCommand.preferredIntervals = [10]
+        c.skipForwardCommand.addTarget { [weak self] _ in
+            Task { @MainActor in self?.pular(10) }; return .success
+        }
+        c.skipBackwardCommand.preferredIntervals = [10]
+        c.skipBackwardCommand.addTarget { [weak self] _ in
+            Task { @MainActor in self?.pular(-10) }; return .success
+        }
         c.nextTrackCommand.addTarget { [weak self] _ in
             Task { @MainActor in self?.step(1) }; return .success
         }
@@ -1329,14 +1389,11 @@ final class PlayerModel: NSObject, ObservableObject {
         }
     }
 
-    private func updateNowPlaying(channel: Channel) {
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
-            MPMediaItemPropertyTitle: channel.name,
-            MPMediaItemPropertyArtist: "Bispo TV",
-            MPNowPlayingInfoPropertyIsLiveStream: true,
-            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
-        ]
-        MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
+    /// Posição, duração e pausa para a Central de Controle (TocandoAgora.swift).
+    private func avisarTocandoAgora() {
+        TocandoAgora.shared.tique(posicao: position, duracao: duration, tocando: isPlaying,
+                                  velocidade: rate,
+                                  canal: playingFile == nil ? selectedChannel : nil)
     }
 
     private func preventSleep(_ on: Bool) {

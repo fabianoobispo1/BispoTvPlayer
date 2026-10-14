@@ -252,8 +252,6 @@ struct FichaTela: View {
         minutos < 60 ? "\(minutos) min" : "\(minutos / 60)h \(String(format: "%02d", minutos % 60))min"
     }
 
-    /// Nocturne: a classificação é uma tag neutra, como no site e na TV Box.
-    private func corDaClassificacao(_ nota: String) -> Color { Tema.neutro300 }
 }
 
 // MARK: - Ator
@@ -337,20 +335,23 @@ struct AtorTela: View {
 
 // MARK: - Peças
 
+/// Nocturne: a classificação é uma tag neutra, como no site e na TV Box.
+func corDaClassificacao(_ nota: String) -> Color { Tema.neutro300 }
+
 @MainActor
-private func botaoVoltar(_ texto: String, acao: @escaping () -> Void) -> some View {
+func botaoVoltar(_ texto: String, acao: @escaping () -> Void) -> some View {
     Button(action: acao) {
         Label(texto, systemImage: "chevron.left")
             .font(.system(size: 14, weight: .medium))
             .padding(.horizontal, 12).padding(.vertical, 6)
-            .background(.white.opacity(0.1), in: Capsule())
+            .vidroCapsula(interativo: true)
     }
     .buttonStyle(.plain)
     .foregroundStyle(.white.opacity(0.85))
     .help("Voltar (Esc)")
 }
 
-private struct Selo: View {
+struct Selo: View {
     let texto: String
     var cor: Color = .white.opacity(0.9)
 
@@ -366,7 +367,7 @@ private struct Selo: View {
 
 /// Cresce um pouco sob o mouse e ao ser pressionado: resposta imediata, sem
 /// mexer no layout de ninguém em volta.
-private struct CresceNoFoco: ButtonStyle {
+struct CresceNoFoco: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Modificador(configuration: configuration)
     }
@@ -407,7 +408,7 @@ private struct FotoRedonda: View {
     }
 }
 
-private struct FotoDePessoa: View {
+struct FotoDePessoa: View {
     let pessoa: Ficha.Pessoa
 
     var body: some View {

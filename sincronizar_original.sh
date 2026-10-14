@@ -39,6 +39,8 @@ renomear() {
       -e 's#Saimo TV#Bispo TV#g' \
       -e 's#SAIMO TV#BISPO TV#g' \
       -e 's#SaimoApp#BispoTvApp#g' \
+      -e 's#github\.com/gabrielsaimo/SaimoPlayer/releases#github.com/fabianoobispo1/BispoTvPlayer/releases#g' \
+      -e 's#https://saimo-monitor\.gabrielsaimo68\.workers\.dev/v1/eventos#https://bispotv-api.fabianoobispo.com.br/v1/eventos#g' \
       -e 's#Saimo Monitor#monitor do Bispo TV#g' \
       -e 's#"saimo\.m3u"#"bispotv.m3u"#g' \
       -e 's#sender-saimo#sender-bispotv#g' \

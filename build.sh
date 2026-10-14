@@ -24,6 +24,7 @@ printf 'enum TMDBChave {\n    static let valor = "%s"\n}\n' "$CHAVE_TMDB" > buil
 
 ./make_icon.sh >/dev/null
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp abertura/abertura-h.mp4 "$APP/Contents/Resources/abertura-h.mp4"
 
 swiftc \
   -module-cache-path build/ModuleCache \

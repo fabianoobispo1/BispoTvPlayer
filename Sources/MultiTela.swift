@@ -393,8 +393,8 @@ struct MolduraDaTela: View {
                     }
                 }
                 .fixedSize()
-                if !model.detachedList {
-                    Button("Mostrar lista") { model.detachedList = true }
+                if !model.detachedList, !Interface.shared.painelCanais {
+                    Button("Mostrar lista") { Interface.shared.painelCanais = true }
                 }
             }
         }

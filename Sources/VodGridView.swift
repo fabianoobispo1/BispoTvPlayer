@@ -1,15 +1,15 @@
 import SwiftUI
 
-/// O acervo em grade, no lugar do vídeo.
+/// O acervo, no lugar do vídeo: as telas da barra do topo que não são o ao
+/// vivo — Início, On Demand e as páginas das categorias, Eventos, Favoritos,
+/// Rádios, Buscar, Ajustes — e, por trás delas, a grade de A a Z, a ficha e a
+/// tela da série.
 ///
-/// Escolher filme por lista de texto é escolher no escuro: o que identifica um
-/// filme é a capa. A grade ocupa a área do player inteira, com as capas grandes
-/// o bastante para reconhecer de longe, e a letra fica numa régua no topo, de
-/// modo que percorrer o acervo seja um gesto só.
+/// As telas em fileiras só dizem o que foi escolhido (`AcoesDoAcervo`); quem
+/// sabe abrir a ficha, montar a série e escolher a fonte é esta.
 struct VodGridView: View {
     @ObservedObject var model: PlayerModel
     @ObservedObject private var estado = VodEstado.shared
-    @ObservedObject private var capas = Capas.shared
     @ObservedObject private var favoritos = VodFavoritos.shared
 
     @State private var carregando = false
@@ -19,13 +19,11 @@ struct VodGridView: View {
     /// os extras ficam de fora do índice de busca de propósito, e é justamente
     /// esse "de fora" que não pode reaparecer numa fileira da tela inicial.
     @State private var nomesDoAcervo: Set<String> = []
-    /// O gênero escolhido na régua, ou vazio para todos.
-    @State private var genero = ""
     @State private var selecaoFonte: SelecaoFonte?
     /// O título cuja ficha está aberta, ou nulo.
     @State private var fichaAberta: Cartao?
 
-    private let colunas = [GridItem(.adaptive(minimum: 168, maximum: 220), spacing: 18)]
+    private let colunas = [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20, alignment: .top)]
 
     private struct OpcaoFonte: Identifiable {
         let versao: String
@@ -48,49 +46,108 @@ struct VodGridView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            cabecalho
-            Divider()
-            // A régua só onde ela filtra alguma coisa: na tela inicial as
-            // fileiras são curadoria, e peneirá-las deixa faixas com um cartão
-            // ou nenhum.
-            if !Generos.todos.isEmpty, estado.secao != .inicio, estado.secao != .eventos { reguaDeGeneros; Divider() }
-
-            conteudo
-        }
-        .background(FundoNocturne())
-        .task { await abrir() }
-        .onChange(of: estado.secao) { antiga, nova in
-            // Busca é sempre sobre a seção aberta: carregar "mae" de Extras
-            // para Filmes mostraria uma lista que ninguém pediu.
-            if antiga != nova { estado.busca = "" }
-            Task { await abrir() }
-        }
-        .sheet(item: $selecaoFonte) { selecao in
-            seletorDeFontes(selecao)
-        }
-        .overlay {
-            if let cartao = fichaAberta {
-                FichaTela(
-                    alvo: FichaAlvo(titulo: cartao.titulo, serie: cartao.serie, ano: cartao.ano,
-                                    letra: cartao.letra, reservado: cartao.reservado),
-                    assistir: {
-                        fichaAberta = nil
-                        cartao.abrir()
-                    },
-                    fechar: { fichaAberta = nil },
-                    abrirTitulo: { achado in fichaAberta = cartaoDe(achado) })
-                // Uma ficha nova para cada título: sem isto, abrir um filme a
-                // partir da filmografia reaproveitava a ficha anterior, que
-                // continuava com o ator aberto por cima do título novo.
-                .id(cartao.id)
-                .transition(.opacity)
+        conteudo
+            .task { await abrir() }
+            .onChange(of: estado.secao) { antiga, nova in
+                // Busca é sempre sobre a seção aberta: carregar "mae" de Extras
+                // para Filmes mostraria uma lista que ninguém pediu.
+                if antiga != nova { estado.busca = "" }
+                Task { await abrir() }
             }
-        }
-        .animation(.easeInOut(duration: 0.18), value: fichaAberta?.id)
+            .onChange(of: estado.explorando) { _, _ in Task { await abrir() } }
+            .sheet(item: $selecaoFonte) { selecao in
+                seletorDeFontes(selecao)
+            }
+            .overlay {
+                if let cartao = fichaAberta {
+                    FichaTela(
+                        alvo: FichaAlvo(titulo: cartao.titulo, serie: cartao.serie, ano: cartao.ano,
+                                        letra: cartao.letra, reservado: cartao.reservado),
+                        assistir: {
+                            fichaAberta = nil
+                            cartao.abrir()
+                        },
+                        fechar: { fichaAberta = nil },
+                        abrirTitulo: abrirDaFilmografia)
+                    // Uma ficha nova para cada título: sem isto, abrir um filme a
+                    // partir da filmografia reaproveitava a ficha anterior, que
+                    // continuava com o ator aberto por cima do título novo.
+                    .id(cartao.id)
+                    .contentMargins(.top, Tema.alturaDaBarra, for: .scrollContent)
+                    .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.18), value: fichaAberta?.id)
     }
 
-    // MARK: - Topo
+    /// O que as telas em fileiras pedem.
+    private var acoes: AcoesDoAcervo {
+        AcoesDoAcervo(
+            abrirTitulo: { abrirDaFilmografia($0) },
+            abrirDestaque: { item in
+                if item.serie {
+                    Task { await abrirDestaque(item) }
+                } else {
+                    fichaAberta = cartaoDeDestaque(item)
+                }
+            },
+            continuar: { andamento in
+                Task { await abrirPorNome(andamento.titulo, serie: andamento.serie) }
+            },
+            abrirFavorito: { item in
+                if item.serie {
+                    Task { await abrirFavorito(item) }
+                } else {
+                    fichaAberta = Cartao(titulo: item.titulo, ano: item.ano, serie: false, detalhe: "Filme",
+                                         progresso: Progresso.fracao(Progresso.chaveFilme(item.titulo)),
+                                         letra: item.letra, reservado: item.reservado) {
+                        Task { await abrirFavorito(item) }
+                    }
+                }
+            },
+            abrirColecao: { serie, episodios in
+                estado.episodios = episodios
+                estado.letraDaSerie = ""
+                estado.serieAberta = serie
+            })
+    }
+
+    // MARK: - Telas
+
+    @ViewBuilder
+    private var conteudo: some View {
+        if let serie = estado.serieAberta {
+            episodiosDe(serie)
+        } else {
+            switch estado.secao {
+            case .inicio:
+                TelaInicio(model: model, acoes: acoes, filasDeDestaque: filasDeDestaque,
+                           nomesDoAcervo: nomesDoAcervo, carregando: carregando)
+            case .ondemand:
+                TelaOnDemand(model: model, tipo: nil, acoes: acoes,
+                             filasDeDestaque: filasDeDestaque, nomesDoAcervo: nomesDoAcervo)
+            case .filmes, .series, .animes, .doramas:
+                if estado.explorando {
+                    telaDaGrade
+                } else {
+                    TelaOnDemand(model: model, tipo: estado.secao, acoes: acoes,
+                                 filasDeDestaque: filasDeDestaque, nomesDoAcervo: nomesDoAcervo)
+                }
+            case .eventos:
+                EventsView(model: model)
+            case .radios:
+                TelaRadios()
+            case .buscar:
+                TelaBusca(model: model, acoes: acoes)
+            case .ajustes:
+                TelaAjustes(model: model)
+            case .favoritos, .extras, nil:
+                telaDaGrade
+            }
+        }
+    }
+
+    // MARK: - Fonte
 
     private func seletorDeFontes(_ selecao: SelecaoFonte) -> some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -148,172 +205,6 @@ struct VodGridView: View {
         .frame(minWidth: 440, minHeight: 260)
     }
 
-    private var cabecalho: some View {
-        HStack(spacing: 12) {
-            Text(estado.secao?.titulo ?? "Acervo")
-                .font(.system(size: 20, weight: .semibold))
-            if let serie = estado.serieAberta {
-                Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                Text(serie.nomeCompleto).font(.system(size: 17))
-                Button {
-                    estado.serieAberta = nil
-                } label: {
-                    Label("Voltar", systemImage: "chevron.left")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
-            if carregando { ProgressView().controlSize(.small) }
-            Spacer()
-            secoesNoTopo
-            TextField(estado.tudo ? "Buscar em todo o acervo" : "Buscar", text: $estado.busca)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 220)
-            Button {
-                estado.secao = nil
-            } label: {
-                Label("Fechar", systemImage: "xmark")
-            }
-            .help("Voltar ao vídeo")
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-    }
-
-    /// As seções ao lado da busca.
-    ///
-    /// Elas existiam só na lateral dos canais, que fica atrás do acervo: com o
-    /// acervo aberto, trocar de Filmes para Séries obrigava a fechar tudo e
-    /// voltar. Aqui em cima, ao lado da busca, ficam as duas coisas que alguém
-    /// quer enquanto procura — e é onde o site e a TV Box já as põem.
-    ///
-    /// Extras só aparece com o código digitado, como em todo lugar.
-    private var secoesNoTopo: some View {
-        HStack(spacing: 6) {
-            ForEach(secoesVisiveis) { secao in
-                Button {
-                    if estado.secao != secao {
-                        estado.serieAberta = nil
-                        estado.secao = secao
-                    }
-                } label: {
-                    Text(secao.titulo)
-                        .font(.system(size: 12, weight: .medium))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule().fill(estado.secao == secao
-                                           ? Tema.acento.opacity(0.14)
-                                           : Color.white.opacity(0.06)))
-                        .foregroundStyle(estado.secao == secao ? Tema.acento : .primary)
-                }
-                .buttonStyle(.plain)
-                .help(secao.titulo)
-            }
-        }
-    }
-
-    private var secoesVisiveis: [VodSecao] {
-        var out: [VodSecao] = [.inicio, .eventos, .filmes, .series, .animes, .doramas]
-        if !favoritos.itens.isEmpty { out.append(.favoritos) }
-        if model.restrictedUnlocked { out.append(.extras) }
-        return out
-    }
-
-    /// Os gêneros, numa régua como a das letras.
-    ///
-    /// O catálogo não tem gênero; ele vem de um arquivo publicado à parte. Por
-    /// isso a régua só existe quando esse arquivo chegou — oferecer um filtro
-    /// que devolve vazio é pior que não oferecer.
-    private var reguaDeGeneros: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                pilulaDeGenero("Todos", valor: "")
-                ForEach(Generos.todos, id: \.self) { nome in
-                    pilulaDeGenero(nome, valor: nome)
-                }
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 7)
-        }
-    }
-
-    private func pilulaDeGenero(_ texto: String, valor: String) -> some View {
-        Button {
-            genero = (genero == valor) ? "" : valor
-        } label: {
-            Text(texto)
-                .font(.system(size: 12, weight: .medium))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(genero == valor
-                                           ? Tema.acento.opacity(0.14)
-                                           : Color.white.opacity(0.06)))
-                .overlay(Capsule().strokeBorder(genero == valor ? Tema.acento : .clear, lineWidth: 1))
-                .foregroundStyle(genero == valor ? Tema.acento : .primary)
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// A lista já sem o que o gênero escolhido deixa de fora.
-    private func porGenero(_ itens: [Cartao]) -> [Cartao] {
-        guard !genero.isEmpty else { return itens }
-        return itens.filter { Generos.tem($0.titulo, serie: $0.serie, genero: genero) }
-    }
-
-    /// Vinte e sete letras não cabem numa coluna sem roubar a tela da grade;
-    /// numa régua, cabem todas e sobra espaço para as capas.
-    private var reguaDeLetras: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                // Procurar um título sem saber a letra dele é o caso comum;
-                // "Tudo" põe o acervo inteiro sob a mesma busca — o da seção
-                // aberta: em Filmes só filmes, em Séries só séries, em Extras
-                // só extras.
-                Button {
-                    estado.tudo = true
-                    estado.serieAberta = nil
-                    estado.ancora = nil
-                    if estado.achadosDe != estado.secao { estado.achados = [] }
-                    Task { await carregarTudo() }
-                } label: {
-                    Text("Tudo")
-                        .font(.system(size: 13, weight: estado.tudo ? .bold : .regular))
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 10)
-                        .background(estado.tudo ? Tema.acento.opacity(0.18) : Color.white.opacity(0.06),
-                                    in: RoundedRectangle(cornerRadius: 6))
-                }
-                .buttonStyle(.plain)
-                .help("Todo o acervo desta seção, para buscar de uma vez")
-
-                ForEach(gavetasVisiveis) { gaveta in
-                    let ativa = !estado.tudo && gaveta.letra == estado.letra
-                    Button {
-                        estado.letra = gaveta.letra
-                        estado.tudo = false
-                        estado.serieAberta = nil
-                        estado.busca = ""
-                        estado.ancora = nil
-                        Task { await carregar() }
-                    } label: {
-                        Text(gaveta.letra)
-                            .font(.system(size: 13, weight: ativa ? .bold : .regular))
-                            .frame(minWidth: 26)
-                            .padding(.vertical, 5)
-                            .padding(.horizontal, 6)
-                            .background(ativa ? Tema.acento.opacity(0.18) : Color.white.opacity(0.06),
-                                        in: RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
-                    .help("\(quantos(gaveta)) títulos")
-                }
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 8)
-        }
-    }
-
     private var gavetasVisiveis: [Vod.Gaveta] {
         estado.gavetas.filter { gaveta in
             switch estado.secao {
@@ -331,84 +222,6 @@ struct VodGridView: View {
         case .series: return gaveta.series
         case .animes, .doramas: return 0
         default: return gaveta.filmes
-        }
-    }
-
-    // MARK: - Início
-
-    /// A primeira tela do acervo: fileiras de capa que correm para o lado.
-    ///
-    /// Uma grade alfabética serve para achar o que já se sabe que existe; não
-    /// serve para descobrir. As fileiras mostram o que há — o que estava sendo
-    /// assistido, o que foi marcado, o que está em alta — e a busca continua no
-    /// mesmo lugar, filtrando dentro delas.
-    ///
-    /// As capas dos destaques chegam prontas do repositório, então abrir esta
-    /// tela não pergunta nada ao TMDB. Só "continue" e favoritos procuram capa,
-    /// e são poucas.
-    @ViewBuilder
-    private var fileiras: some View {
-        let visiveis = filasVisiveis
-        if visiveis.isEmpty {
-            aviso(carregando ? "Carregando…" : "Nada aqui")
-        } else {
-            ScrollView {
-                // O espaço entre fileiras é maior que o de dentro delas de
-                // propósito: é ele que faz o olho ler "outra fileira" em vez
-                // de uma grade contínua. Com pouco, o nome da fileira parece
-                // pertencer aos cartões de cima.
-                LazyVStack(alignment: .leading, spacing: 38) {
-                    ForEach(visiveis) { fila in
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text(fila.titulo)
-                                .font(.title3.weight(.semibold))
-                                .padding(.horizontal, 22)
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(alignment: .top, spacing: 18) {
-                                    ForEach(fila.cartoes) { cartao in
-                                        celula(cartao).frame(width: 150)
-                                    }
-                                }
-                                .padding(.horizontal, 22)
-                                // A estrela e a moldura do foco passam da
-                                // borda do cartão; sem esta folga elas saem
-                                // cortadas pela rolagem.
-                                .padding(.vertical, 2)
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 22)
-            }
-        }
-    }
-
-    private struct FilaNaTela: Identifiable {
-        let titulo: String
-        let cartoes: [Cartao]
-        var id: String { titulo }
-    }
-
-    /// As fileiras já filtradas pela busca: digitar procura dentro do que está
-    /// à vista, e a fileira que ficou sem nada sai da tela.
-    private var filasVisiveis: [FilaNaTela] {
-        var out: [FilaNaTela] = []
-        if !itensEmAndamento.isEmpty {
-            out.append(FilaNaTela(titulo: "Continue assistindo", cartoes: itensEmAndamento))
-        }
-        if !itensFavoritos.isEmpty {
-            out.append(FilaNaTela(titulo: "Favoritos", cartoes: itensFavoritos))
-        }
-        for fila in filasDeDestaque {
-            let cartoes = fila.itens.map { cartaoDeDestaque($0) }
-            if !cartoes.isEmpty { out.append(FilaNaTela(titulo: fila.titulo, cartoes: cartoes)) }
-        }
-        guard !estado.busca.isEmpty else { return out }
-        return out.compactMap { fila in
-            let filtrados = fila.cartoes.filter {
-                $0.nomeCompleto.localizedCaseInsensitiveContains(estado.busca)
-            }
-            return filtrados.isEmpty ? nil : FilaNaTela(titulo: fila.titulo, cartoes: filtrados)
         }
     }
 
@@ -500,27 +313,6 @@ struct VodGridView: View {
         await abrirAchado(alvo, reservado: false)
     }
 
-    // MARK: - Grade
-
-    @ViewBuilder
-    private var conteudo: some View {
-        if let serie = estado.serieAberta {
-            episodiosDe(serie)
-        } else if estado.secao == .inicio {
-            fileiras
-        } else if estado.secao == .eventos {
-            EventsView(model: model)
-        } else if estado.secao == .favoritos {
-            grade(itensFavoritos)
-        } else if estado.tudo {
-            grade(itensDeTudo)
-        } else if [.series, .animes, .doramas].contains(estado.secao) {
-            grade(itensSeries)
-        } else {
-            grade(itensFilmes)
-        }
-    }
-
     /// O que uma célula precisa mostrar, venha de filme, série ou favorito.
     private struct Cartao: Identifiable {
         let titulo: String
@@ -540,28 +332,201 @@ struct VodGridView: View {
         var id: String { (serie ? "s:" : "f:") + nomeCompleto }
     }
 
-    private func grade(_ todos: [Cartao]) -> some View {
-        let itens = porGenero(todos)
-        let visiveis = estado.busca.isEmpty ? itens : itens.filter {
-            $0.nomeCompleto.localizedCaseInsensitiveContains(estado.busca)
+    // MARK: - Grade
+
+    /// Um tipo inteiro em capas, como a grade da TV: as letras numa coluna à
+    /// esquerda para pular direto (vinte mil filmes não se descem rolando), e
+    /// no alto o nome, quantos são, o gênero, a ordem e a busca.
+    private var telaDaGrade: some View {
+        let itens = itensDaGrade
+        let visiveis = filtrados(itens)
+        return VStack(alignment: .leading, spacing: 14) {
+            cabecalhoDaGrade(total: visiveis.count)
+                .padding(.horizontal, Tema.margem)
+            HStack(alignment: .top, spacing: 0) {
+                if !gavetasVisiveis.isEmpty, estado.secao != .favoritos {
+                    colunaDeLetras
+                }
+                grade(visiveis)
+            }
         }
+        .padding(.top, Tema.alturaDaBarra + 14)
+    }
+
+    private var itensDaGrade: [Cartao] {
+        switch estado.secao {
+        case .favoritos: return itensFavoritos
+        case .series, .animes, .doramas: return estado.tudo && estado.secao == .series ? itensDeTudo : itensSeries
+        default: return estado.tudo ? itensDeTudo : itensFilmes
+        }
+    }
+
+    private var tituloDaGrade: String {
+        guard let secao = estado.secao else { return "Acervo" }
+        return secao.ehCategoria ? "\(secao.titulo) de A a Z" : secao.titulo
+    }
+
+    private func cabecalhoDaGrade(total: Int) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            if estado.secao?.ehCategoria == true {
+                botaoVoltar(estado.secao?.titulo ?? "Voltar") {
+                    estado.genero = ""
+                    estado.explorando = false
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tituloDaGrade)
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundStyle(.white)
+                Text(carregando ? "Carregando…" : "\(total.formatted()) títulos"
+                     + (estado.genero.isEmpty ? "" : " · \(estado.genero)"))
+                    .font(.system(size: 14))
+                    .foregroundStyle(Tema.acento)
+            }
+            Spacer(minLength: 12)
+            GrupoDeVidro(espacamento: 8) {
+                HStack(spacing: 8) {
+                    if !Generos.todos.isEmpty {
+                        Menu {
+                            Button { estado.genero = "" } label: {
+                                Text(estado.genero.isEmpty ? "✓  Todos" : "    Todos")
+                            }
+                            Divider()
+                            ForEach(Generos.todos, id: \.self) { nome in
+                                Button { estado.genero = nome } label: {
+                                    Text(estado.genero == nome ? "✓  \(nome)" : "    \(nome)")
+                                }
+                            }
+                        } label: {
+                            Label(estado.genero.isEmpty ? "Gênero" : estado.genero,
+                                  systemImage: "line.3.horizontal.decrease")
+                        }
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .botaoDeVidro()
+                    }
+                    Menu {
+                        Button { estado.novosPrimeiro = false } label: {
+                            Text(estado.novosPrimeiro ? "    De A a Z" : "✓  De A a Z")
+                        }
+                        Button { estado.novosPrimeiro = true } label: {
+                            Text(estado.novosPrimeiro ? "✓  Mais novos primeiro" : "    Mais novos primeiro")
+                        }
+                    } label: {
+                        Label(estado.novosPrimeiro ? "Mais novos" : "A a Z", systemImage: "arrow.up.arrow.down")
+                    }
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .botaoDeVidro()
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.white.opacity(0.6))
+                        TextField(estado.tudo ? "Buscar nesta lista" : "Buscar na letra", text: $estado.busca)
+                            .textFieldStyle(.plain)
+                            .frame(width: 180)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .vidroCapsula()
+                }
+            }
+            if carregando { ProgressView().controlSize(.small) }
+        }
+    }
+
+    /// A lista já sem o que o gênero escolhido deixa de fora, filtrada pela
+    /// busca e na ordem escolhida.
+    private func filtrados(_ todos: [Cartao]) -> [Cartao] {
+        var itens = porGenero(todos)
+        if !estado.busca.isEmpty {
+            itens = itens.filter { $0.nomeCompleto.localizedCaseInsensitiveContains(estado.busca) }
+        }
+        if estado.novosPrimeiro {
+            itens = itens.enumerated().sorted { a, b in
+                let x = CartoesDoAcervo.ano(a.element.titulo, a.element.ano)
+                let y = CartoesDoAcervo.ano(b.element.titulo, b.element.ano)
+                return x != y ? x > y : a.offset < b.offset
+            }.map(\.element)
+        }
+        return itens
+    }
+
+    private func porGenero(_ itens: [Cartao]) -> [Cartao] {
+        guard !estado.genero.isEmpty else { return itens }
+        return itens.filter { Generos.tem($0.titulo, serie: $0.serie, genero: estado.genero) }
+    }
+
+    /// As letras numa coluna, como na TV: "Tudo" põe a seção inteira sob a
+    /// mesma busca; cada letra carrega só os títulos dela.
+    private var colunaDeLetras: some View {
+        ScrollView {
+            VStack(spacing: 3) {
+                letra("Tudo", ativa: estado.tudo, ajuda: "Todo o acervo desta seção, para buscar de uma vez") {
+                    estado.tudo = true
+                    estado.serieAberta = nil
+                    estado.ancora = nil
+                    if estado.achadosDe != estado.secao { estado.achados = [] }
+                    Task { await carregarTudo() }
+                }
+                ForEach(gavetasVisiveis) { gaveta in
+                    letra(gaveta.letra, ativa: !estado.tudo && gaveta.letra == estado.letra,
+                          ajuda: "\(quantos(gaveta)) títulos") {
+                        estado.letra = gaveta.letra
+                        estado.tudo = false
+                        estado.serieAberta = nil
+                        estado.busca = ""
+                        estado.ancora = nil
+                        Task { await carregar() }
+                    }
+                }
+            }
+            .padding(6)
+        }
+        .scrollIndicators(.hidden)
+        .frame(width: 64)
+        .vidroPainel(raio: 20)
+        .padding(.leading, 18)
+        .padding(.bottom, 18)
+    }
+
+    private func letra(_ texto: String, ativa: Bool, ajuda: String, acao: @escaping () -> Void) -> some View {
+        Button(action: acao) {
+            Text(texto)
+                .font(.system(size: texto.count > 1 ? 12 : 15, weight: ativa ? .bold : .medium))
+                .foregroundStyle(ativa ? Tema.acento200 : Color.white)
+                .frame(width: 48, height: 30)
+                .background(Capsule().fill(ativa ? Tema.acento900 : Color.clear))
+                .overlay(Capsule().strokeBorder(ativa ? Tema.acento : .clear, lineWidth: 1.5))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(ajuda)
+    }
+
+    private func grade(_ visiveis: [Cartao]) -> some View {
         if !carregando {
             let vazio = visiveis.isEmpty
             Telemetria.shared.buscou(.vod, estado.busca) { !vazio }
         }
         return Group {
             if visiveis.isEmpty {
-                aviso(carregando ? "Carregando…" : "Nada aqui")
+                aviso(carregando ? "Carregando…"
+                      : estado.secao == .favoritos
+                        ? "Nenhum favorito ainda. Clique com o botão direito num título para favoritar."
+                        : "Nada aqui")
             } else {
                 ScrollViewReader { rolagem in
                     ScrollView {
-                        LazyVGrid(columns: colunas, spacing: 22) {
+                        LazyVGrid(columns: colunas, spacing: 26) {
                             ForEach(visiveis) { cartao in
                                 celula(cartao).id(cartao.id)
                             }
                         }
-                        .padding(18)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 6)
+                        .padding(.bottom, 30)
                     }
+                    .scrollIndicators(.hidden)
                     .onAppear {
                         guard let alvo = estado.ancora else { return }
                         // Um quadro depois: a grade precisa existir antes de
@@ -574,111 +539,33 @@ struct VodGridView: View {
     }
 
     private func celula(_ cartao: Cartao) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            ZStack(alignment: .bottom) {
-                capa(cartao.nomeCompleto, serie: cartao.serie)
-                if let visto = cartao.progresso {
-                    // A barra vai na própria capa: é onde o olho já está.
-                    ProgressView(value: visto)
-                        .progressViewStyle(.linear)
-                        .tint(Tema.acento)
-                        .padding(.horizontal, 6)
-                        .padding(.bottom, 6)
-                }
-            }
-            .overlay(alignment: .topTrailing) { estrela(cartao) }
-            .overlay(alignment: .topLeading) {
-                if let selo = cartao.selo {
-                    Text(selo)
-                        .font(.system(size: 10, weight: .heavy))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(.black.opacity(0.65), in: Capsule())
-                        .foregroundStyle(.white)
-                        .padding(6)
-                }
-            }
-            .contentShape(Rectangle())
-            // O cartaz abre a ficha, como no celular e na TV Box: saber do que
-            // o filme trata antes de gastar dois minutos abrindo a fonte.
-            .onTapGesture { escolher(cartao) }
-            // Para o VoiceOver e o teclado o cartaz é um botão: sem isto ele
-            // era só uma imagem, e não havia como abri-lo sem o mouse.
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityLabel(cartao.nomeCompleto)
-            .accessibilityAction { escolher(cartao) }
-
-            Text(cartao.nomeCompleto)
-                .font(.system(size: 13, weight: .medium))
-                .lineLimit(2, reservesSpace: true)
-                .foregroundStyle(.white)
-            Text(detalheComAno(cartao))
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.55))
-                .lineLimit(1)
-        }
-        .help(cartao.nomeCompleto)
-    }
-
-    /// O detalhe do cartão, com o ano na frente quando o nome não traz nenhum.
-    ///
-    /// Mais da metade do acervo chega sem ano no título, e sem ele não dá para
-    /// saber se o cartão é o filme de 1987 ou a refilmagem. O ano vem do mesmo
-    /// TMDB que já é consultado para a capa, então não custa pedido nenhum a
-    /// mais — só aparece quando a resposta chega.
-    private func detalheComAno(_ cartao: Cartao) -> String {
-        guard cartao.ano.isEmpty,
-              cartao.titulo.range(of: #"\((19|20)\d{2}\)\s*$"#,
-                                  options: .regularExpression) == nil,
-              let ano = capas.ano(para: cartao.nomeCompleto, serie: cartao.serie)
-        else { return cartao.detalhe }
-        return "\(ano) · \(cartao.detalhe)"
-    }
-
-    private func escolher(_ cartao: Cartao) {
-        if cartao.direto { cartao.abrir() } else { fichaAberta = cartao }
-    }
-
-    private func estrela(_ cartao: Cartao) -> some View {
         let item = VodFavoritos.Item(titulo: cartao.titulo, serie: cartao.serie,
                                      letra: cartao.letra, reservado: cartao.reservado,
                                      ano: cartao.ano)
         let marcado = favoritos.contem(cartao.titulo, serie: cartao.serie, ano: cartao.ano)
-        return Button {
-            favoritos.alternar(item)
-        } label: {
-            Image(systemName: marcado ? "star.fill" : "star")
-                .font(.system(size: 12, weight: .semibold))
-                .padding(5)
-                .background(.black.opacity(0.45), in: Circle())
-                .foregroundStyle(marcado ? Tema.acento300 : .white.opacity(0.8))
+        // O cartaz abre a ficha, como no celular e na TV Box: saber do que
+        // o filme trata antes de gastar dois minutos abrindo a fonte.
+        return Button { escolher(cartao) } label: {
+            CelulaDaGrade(titulo: cartao.nomeCompleto, serie: cartao.serie, progresso: cartao.progresso,
+                          selo: cartao.selo, favorito: marcado, detalhe: cartao.detalhe,
+                          procurarAno: cartao.ano.isEmpty
+                            && cartao.titulo.range(of: #"\((19|20)\d{2}\)\s*$"#, options: .regularExpression) == nil)
         }
-        .buttonStyle(.plain)
-        .padding(6)
-        .help(marcado ? "Remover dos favoritos" : "Favoritar")
-    }
-
-    /// A capa chega da rede quando a célula aparece; até lá a moldura segura o
-    /// lugar, para a grade não pular de altura enquanto rola.
-    private func capa(_ titulo: String, serie: Bool) -> some View {
-        let imagem = capas.imagem(para: titulo, serie: serie)
-        return ZStack {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.white.opacity(0.07))
-            if let imagem {
-                Image(nsImage: imagem)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                Image(systemName: serie ? "tv" : "film")
-                    .font(.system(size: 26))
-                    .foregroundStyle(.white.opacity(0.25))
+        .buttonStyle(CartaoEmFoco(raio: 10))
+        .contextMenu {
+            Button(marcado ? "Remover dos favoritos" : "Favoritar") { favoritos.alternar(item) }
+            if !cartao.serie, !cartao.direto {
+                Button("Assistir sem abrir a ficha") { cartao.abrir() }
             }
         }
-        .frame(height: 250)
-        .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityLabel(cartao.nomeCompleto)
+        .help(cartao.nomeCompleto)
+    }
+
+    /// Série vai direto à tela dela, que já traz a ficha junto dos episódios,
+    /// como na TV Box; filme passa pela ficha.
+    private func escolher(_ cartao: Cartao) {
+        if cartao.direto || cartao.serie { cartao.abrir() } else { fichaAberta = cartao }
     }
 
     // MARK: - Itens
@@ -708,6 +595,7 @@ struct VodGridView: View {
                    letra: estado.letra,
                    reservado: false) {
                 estado.ancora = "s:" + serie.nomeCompleto
+                estado.letraDaSerie = estado.letra
                 if let prontos = estado.episodiosColecao[serie.id] {
                     estado.episodios = prontos
                     estado.serieAberta = serie
@@ -768,95 +656,55 @@ struct VodGridView: View {
 
     // MARK: - Episódios
 
-    /// O episódio desta série que está no ar, se for ela que está tocando.
-    private func noArDe(_ serie: Serie) -> EpisodioNoAr? {
-        guard let ep = model.episodioNoAr, ep.serie == serie.nomeCompleto else { return nil }
-        return ep
-    }
-
+    /// A série aberta, com a ficha e os episódios na mesma tela (`SerieTela`).
     private func episodiosDe(_ serie: Serie) -> some View {
-        let temporadas = Set(estado.episodios.map(\.temporada)).sorted()
-        let noAr = noArDe(serie)
-        return ScrollViewReader { rolagem in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(temporadas, id: \.self) { temporada in
-                        Text("Temporada \(temporada)")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.top, 18)
-                            .padding(.horizontal, 18)
-                        ForEach(daTemporada(temporada)) { episodio in
-                            linhaEpisodio(serie, episodio).id(episodio.id)
-                            Divider().padding(.leading, 18)
-                        }
-                    }
-                }
-            }
-            .onAppear {
-                // A série que está tocando abre na temporada e no episódio
-                // em que se está, e não na primeira temporada.
-                guard let noAr else { return }
-                let alvo = estado.episodios.first {
-                    $0.temporada == noAr.temporada && $0.numero == noAr.numero && $0.versao == noAr.versao
-                } ?? estado.episodios.first { $0.temporada == noAr.temporada && $0.numero == noAr.numero }
-                guard let alvo else { return }
-                DispatchQueue.main.async { rolagem.scrollTo(alvo.id, anchor: .center) }
-            }
+        SerieTela(model: model, serie: serie, episodios: estado.episodios,
+                  letra: estado.letraDaSerie,
+                  voltar: { estado.serieAberta = nil },
+                  tocar: { tocarEpisodio(serie, $0) },
+                  abrirTitulo: abrirDaFilmografia)
+            // Uma tela nova para cada série: a temporada e a fileira de uma
+            // não podem vazar para a seguinte.
+            .id(serie.id)
+            // O conteúdo começa abaixo da barra de vidro; a imagem larga
+            // continua passando por baixo dela.
+            .contentMargins(.top, Tema.alturaDaBarra, for: .scrollContent)
+    }
+
+    private func tocarEpisodio(_ serie: Serie, _ episodio: Episodio) {
+        // O episódio que já está no ar só devolve ao vídeo: abrir de novo
+        // recomeçaria do zero o que estava tocando.
+        if let noAr = model.episodioNoAr, noAr.serie == serie.nomeCompleto,
+           noAr.temporada == episodio.temporada, noAr.numero == episodio.numero,
+           noAr.versao == episodio.versao {
+            estado.secao = nil
+            return
         }
-    }
-
-    private func daTemporada(_ temporada: Int) -> [Episodio] {
-        estado.episodios.filter { $0.temporada == temporada }
-            .sorted { ($0.numero, $0.versao) < ($1.numero, $1.versao) }
-    }
-
-    private func linhaEpisodio(_ serie: Serie, _ episodio: Episodio) -> some View {
         let chave = Progresso.chaveEpisodio(
             serie.nomeCompleto, episodio.temporada, episodio.numero)
+        model.episodioPendente = EpisodioNoAr(
+            serie: serie.nomeCompleto, temporada: episodio.temporada,
+            numero: episodio.numero, versao: episodio.versao, lista: estado.episodios)
         let detalhe = "Temporada \(episodio.temporada), episódio \(episodio.numero)"
-        let noAr = noArDe(serie).map {
-            $0.temporada == episodio.temporada && $0.numero == episodio.numero && $0.versao == episodio.versao
-        } ?? false
-        return HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    if noAr {
-                        Image(systemName: "play.fill").foregroundStyle(Tema.acento)
-                    }
-                    Text("Episódio \(episodio.numero)").foregroundStyle(.white)
-                    if noAr {
-                        Text("Assistindo")
-                            .font(.caption.weight(.semibold)).foregroundStyle(Tema.acento)
-                    }
-                    Text(rotulo(episodio.versao))
-                        .font(.caption).foregroundStyle(.white.opacity(0.5))
-                    if episodio.urls.count > 1 {
-                        Text("\(episodio.urls.count) fontes")
-                            .font(.caption).foregroundStyle(.white.opacity(0.5))
-                    }
-                }
-                if let visto = Progresso.fracao(chave) {
-                    ProgressView(value: visto)
-                        .progressViewStyle(.linear)
-                        .frame(width: 220)
-                        .controlSize(.mini)
-                }
-            }
-            Spacer()
-            Button("Assistir") {
-                model.episodioPendente = EpisodioNoAr(
-                    serie: serie.nomeCompleto, temporada: episodio.temporada,
-                    numero: episodio.numero, versao: episodio.versao, lista: estado.episodios)
-                escolherFonte(nome: serie.nomeCompleto,
-                              fontes: [episodio.versao: episodio.urls],
-                              detalhe: detalhe, chave: chave)
-            }
-            .controlSize(.small)
+        // Série que já vem tocando: a fonte de sempre vai no topo da lista,
+        // e um clique (ou Enter) a mantém. A pessoa ainda escolhe outra.
+        let preferidas = model.fontesPreferidas(serie: serie.nomeCompleto, urls: episodio.urls)
+        escolherFonte(nome: serie.nomeCompleto,
+                      fontes: [episodio.versao: preferidas],
+                      detalhe: detalhe,
+                      chave: chave,
+                      manterOrdem: model.fonteLembrada(serie.nomeCompleto))
+    }
+
+    /// Um título vindo da filmografia de um ator: filme abre a ficha, série
+    /// abre a tela dela, que já é ficha e episódios ao mesmo tempo.
+    private func abrirDaFilmografia(_ achado: Vod.Achado) {
+        if achado.serie {
+            fichaAberta = nil
+            Task { await abrirAchado(achado, reservado: false) }
+        } else {
+            fichaAberta = cartaoDe(achado)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 10)
-        .background(noAr ? Tema.acento.opacity(0.18) : Color.clear)
     }
 
     // MARK: - Ações
@@ -867,7 +715,8 @@ struct VodGridView: View {
         if estado.gavetas.isEmpty { estado.gavetas = await Vod.indice() }
         estado.filmes = secao.pedeFilmes
         estado.reservado = secao == .extras
-        if secao == .inicio {
+        let emFileiras = secao == .inicio || secao == .ondemand || (secao.ehCategoria && !estado.explorando)
+        if emFileiras {
             if filasDeDestaque.isEmpty {
                 carregando = true
                 filasDeDestaque = await Destaques.filas()
@@ -879,7 +728,8 @@ struct VodGridView: View {
             await Generos.carregar()
             return
         }
-        guard secao != .favoritos else { return }
+        // Telas que cuidam do que mostram.
+        guard ![.eventos, .radios, .buscar, .ajustes, .favoritos].contains(secao) else { return }
         if secao == .animes || secao == .doramas {
             await carregarColecao(secao)
             return
@@ -930,6 +780,7 @@ struct VodGridView: View {
             carregando = true
             estado.episodios = await Vod.episodios(letra: letra, serie: serie)
             carregando = false
+            estado.letraDaSerie = letra
             estado.serieAberta = serie
         }
     }
@@ -967,6 +818,7 @@ struct VodGridView: View {
                     $0.titulo == item.titulo && (item.ano.isEmpty || $0.ano == item.ano)
                 }) else { return }
             estado.episodios = await Vod.episodios(letra: item.letra, serie: achada)
+            estado.letraDaSerie = item.letra
             estado.serieAberta = achada
         } else {
             guard let achado = await Vod.filmes(letra: item.letra, reservados: item.reservado)
@@ -978,7 +830,8 @@ struct VodGridView: View {
     /// Uma única fonte abre direto. Com duas ou mais, nenhuma ganha prioridade
     /// escondida: idioma, número e servidor ficam visíveis antes do play.
     private func escolherFonte(nome: String, fontes: [String: [String]],
-                               detalhe: String, chave: String) {
+                               detalhe: String, chave: String,
+                               manterOrdem: Bool = false) {
         let ordenadas = fontes.keys.sorted {
             let esquerda = ($0 == "leg" ? 1 : 0, $0)
             let direita = ($1 == "leg" ? 1 : 0, $1)
@@ -987,7 +840,8 @@ struct VodGridView: View {
         let pares = ordenadas.flatMap { versao -> [(String, String)] in
             // Dentro de um idioma, a de maior resolução primeiro: é ela que
             // toca quando ninguém escolhe nada.
-            let lista = (fontes[versao] ?? []).sorted {
+            let original = fontes[versao] ?? []
+            let lista = manterOrdem ? original : original.sorted {
                 Vod.posicao(daQualidade: Vod.qualidade(de: $0))
                     < Vod.posicao(daQualidade: Vod.qualidade(de: $1))
             }
@@ -1041,5 +895,82 @@ struct VodGridView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Uma capa da grade: o pôster, a barra do quanto foi visto, o selo de
+/// resolução, a estrela do favorito e, embaixo, o nome e o detalhe.
+///
+/// Mais da metade do acervo chega sem ano no título; o ano vem do mesmo TMDB
+/// que já é consultado para a capa, e só aparece quando a resposta chega.
+private struct CelulaDaGrade: View {
+    let titulo: String
+    let serie: Bool
+    let progresso: Double?
+    let selo: String?
+    let favorito: Bool
+    let detalhe: String
+    let procurarAno: Bool
+    @ObservedObject private var capas = Capas.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Tema.cartao)
+                ImagemRemota(endereco: Generos.capa(titulo, serie: serie)) {
+                    if let imagem = capas.imagem(para: titulo, serie: serie) {
+                        Image(nsImage: imagem).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
+                    } else {
+                        Image(systemName: serie ? "tv" : "film")
+                            .font(.system(size: 26))
+                            .foregroundStyle(.white.opacity(0.25))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                if let progresso, progresso > 0 {
+                    BarraDeProgresso(fracao: progresso)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 8)
+                }
+            }
+            .aspectRatio(2.0 / 3.0, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(alignment: .topLeading) {
+                if let selo {
+                    Text(selo)
+                        .font(.system(size: 10, weight: .heavy))
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(.black.opacity(0.65), in: Capsule())
+                        .foregroundStyle(.white)
+                        .padding(6)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if favorito {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Tema.acento300)
+                        .padding(5)
+                        .background(.black.opacity(0.5), in: Circle())
+                        .padding(6)
+                }
+            }
+            .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+
+            Text(titulo)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(2, reservesSpace: true)
+                .foregroundStyle(.white)
+            Text(detalheComAno)
+                .font(.system(size: 11))
+                .foregroundStyle(Tema.textoSecundario)
+                .lineLimit(1)
+        }
+    }
+
+    private var detalheComAno: String {
+        guard procurarAno, let ano = capas.ano(para: titulo, serie: serie) else { return detalhe }
+        return "\(ano) · \(detalhe)"
     }
 }

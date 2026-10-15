@@ -204,7 +204,7 @@ struct LoginView: View {
             Campo(rotulo: "Senha", texto: $senha, segredo: true)
             if let erro { MensagemErro(texto: erro) }
             BotaoPrincipal(titulo: "Entrar", ocupado: ocupado) { enviar() }
-            Text("Esqueceu a senha? [Mande SENHA no WhatsApp](https://bispotv.pages.dev/senha) e receba uma nova.")
+            Text("Esqueceu a senha? [Mande SENHA no WhatsApp](https://bispotv.pages.dev/senha) e receba um link para criar outra.")
                 .font(.caption).foregroundStyle(.secondary)
             Divider().overlay(Tema.neutro800).padding(.top, 4)
             VStack(spacing: 10) {

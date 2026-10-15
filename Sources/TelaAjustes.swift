@@ -18,6 +18,9 @@ struct TelaAjustes: View {
     @ObservedObject var model: PlayerModel
     @ObservedObject private var epg = EPGService.shared
     @State private var abrirNoCanal = Preferencias.abrirNoCanal
+    @ObservedObject private var conta = Conta.shared
+    /// Sair pede um segundo clique, para não sair sem querer.
+    @State private var confirmandoSaida = false
 
     private var versao: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -30,6 +33,33 @@ struct TelaAjustes: View {
                     Text("Ajustes")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.white)
+
+                    // Bispo TV: a conta, no topo, como nos Ajustes da TV Box e do celular.
+                    if let info = conta.info {
+                        secao("Conta") {
+                            linha(info.nome ?? info.email, "\(info.email) · \(situacao(info))", icone: "person.crop.circle.fill") {
+                                NSWorkspace.shared.open(URL(string: "https://bispotv.pages.dev/conta")!)
+                            }
+                            if info.whatsapp != true {
+                                linha("Ligar meu WhatsApp", "Para recuperar a senha sozinho e receber os avisos",
+                                      icone: "message.fill") {
+                                    Task { try? await conta.ligarWhatsapp() }
+                                }
+                            }
+                            linha(confirmandoSaida ? "Clique de novo para sair" : "Sair da conta",
+                                  "Desconecta \(info.email) deste Mac", icone: "rectangle.portrait.and.arrow.right") {
+                                if confirmandoSaida {
+                                    Task { await conta.sair() }
+                                } else {
+                                    confirmandoSaida = true
+                                    Task { @MainActor in
+                                        try? await Task.sleep(for: .seconds(4))
+                                        confirmandoSaida = false
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     secao("Reprodução") {
                         alternador("Preencher a tela", "Corta as bordas em vez de mostrar faixas pretas",
@@ -88,6 +118,20 @@ struct TelaAjustes: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollIndicators(.hidden)
+        }
+    }
+
+    /// A assinatura numa frase (a mesma da página da conta no site).
+    private func situacao(_ info: Conta.Info) -> String {
+        let data = info.pagoAte.flatMap { ISO8601DateFormatter.comFracao.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }
+            .map { $0.formatted(.dateTime.day().month(.twoDigits)) } ?? ""
+        if info.plano == "legado" { return "Acesso gratuito" }
+        switch info.situacao {
+        case "teste": return "Teste grátis até \(data)"
+        case "ativa": return data.isEmpty ? "Assinatura ativa" : "Assinatura ativa até \(data)"
+        case "atrasada": return "Assinatura vencida em \(data)"
+        case "bloqueada": return "Conta bloqueada"
+        default: return "Conta ativa"
         }
     }
 
@@ -165,4 +209,13 @@ private struct LinhaSobMouse: ButtonStyle {
                 .onHover { sobre = $0 }
         }
     }
+}
+
+private extension ISO8601DateFormatter {
+    /// "2026-10-15T21:24:22.501Z": a API manda com milissegundos.
+    nonisolated(unsafe) static let comFracao: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 }

@@ -86,6 +86,7 @@ struct BarraDoTopo: View {
     @ObservedObject var model: PlayerModel
     @ObservedObject private var estado = VodEstado.shared
     @ObservedObject private var radios = Radios.shared
+    @ObservedObject private var conta = Conta.shared
     /// Em tela cheia não há botões de janela à esquerda: a barra encosta.
     var telaCheia: Bool
 
@@ -126,6 +127,23 @@ struct BarraDoTopo: View {
 
             if radios.tocando != nil {
                 RadioNaBarra()
+            }
+
+            // Bispo TV: a conta à vista, com a inicial; abre os Ajustes, onde
+            // ficam a assinatura, o WhatsApp e o Sair.
+            if let info = conta.info {
+                let nome = info.nome ?? info.email
+                Button { Aba.ajustes.abrir() } label: {
+                    Text(String(nome.prefix(1)).uppercased())
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Tema.acento200)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Tema.acento900))
+                        .overlay(Circle().strokeBorder(Tema.acento, lineWidth: 1.5))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("\(info.email): conta e sair (Ajustes)")
             }
 
             Button { Aba.ajustes.abrir() } label: {

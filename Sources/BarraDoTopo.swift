@@ -35,9 +35,12 @@ enum Aba: String, CaseIterable, Identifiable {
         }
     }
 
-    /// A aba que a seção aberta representa. Sem seção é o vídeo: Ao vivo.
+    /// A aba que a seção aberta representa. Sem seção é o vídeo: Ao vivo (ou On Demand se arquivo em reprodução).
     @MainActor
     static func de(_ secao: VodSecao?) -> Aba {
+        if secao == nil && PlayerModel.shared.playingFile != nil {
+            return .onDemand
+        }
         switch secao {
         case nil: return .aoVivo
         case .inicio: return .inicio
@@ -63,6 +66,9 @@ enum Aba: String, CaseIterable, Identifiable {
             // O vídeo volta para o lugar dele; a rádio para, porque o ao
             // vivo volta a tocar.
             Radios.shared.parar()
+            if PlayerModel.shared.playingFile != nil {
+                PlayerModel.shared.voltarAoVivo()
+            }
             estado.secao = nil
         case .inicio: estado.secao = .inicio
         case .eventos: estado.secao = .eventos
@@ -105,69 +111,73 @@ struct BarraDoTopo: View {
 
     var body: some View {
         let atual = Aba.de(estado.secao)
-        HStack(spacing: 10) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .interpolation(.high)
-                .frame(width: 30, height: 30)
-                .help("Bispo TV")
-
+        ZStack {
+            // As abas de navegação perfeitamente centralizadas na largura da tela
             GrupoDeVidro(espacamento: 4) {
                 ViewThatFits(in: .horizontal) {
                     fileiraDeAbas(atual, comNome: true)
                     fileiraDeAbas(atual, comNome: false)
                 }
             }
-            .layoutPriority(1)
+            .frame(maxWidth: .infinity, alignment: .center)
 
-            Spacer(minLength: 0)
-                .frame(maxWidth: .infinity, minHeight: 30)
-                .contentShape(Rectangle())
-                .gesture(WindowDragGesture())
+            // Elementos das extremidades (esquerda e direita)
+            HStack(spacing: 10) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 30, height: 30)
+                    .help("Bispo TV")
+                    .padding(.leading, telaCheia ? 22 : 84)
 
-            if radios.tocando != nil {
-                RadioNaBarra()
-            }
+                Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, minHeight: 30)
+                    .contentShape(Rectangle())
+                    .gesture(WindowDragGesture())
 
-            // Bispo TV: a conta à vista, com a inicial; abre os Ajustes, onde
-            // ficam a assinatura, o WhatsApp e o Sair.
-            if let info = conta.info {
-                let nome = info.nome ?? info.email
+                if radios.tocando != nil {
+                    RadioNaBarra()
+                }
+
+                // Bispo TV: a conta à vista, com a inicial; abre os Ajustes, onde
+                // ficam a assinatura, o WhatsApp e o Sair.
+                if let info = conta.info {
+                    let nome = info.nome ?? info.email
+                    Button { Aba.ajustes.abrir() } label: {
+                        Text(String(nome.prefix(1)).uppercased())
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Tema.acento200)
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Tema.acento900))
+                            .overlay(Circle().strokeBorder(Tema.acento, lineWidth: 1.5))
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("\(info.email): conta e sair (Ajustes)")
+                }
+
                 Button { Aba.ajustes.abrir() } label: {
-                    Text(String(nome.prefix(1)).uppercased())
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Tema.acento200)
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Tema.acento900))
-                        .overlay(Circle().strokeBorder(Tema.acento, lineWidth: 1.5))
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(atual == .ajustes ? Tema.acento200 : Color.white)
+                        .background {
+                            if atual == .ajustes {
+                                Circle().fill(Tema.acento900)
+                                Circle().strokeBorder(Tema.acento, lineWidth: 1.5)
+                            }
+                        }
+                        .vidro(Circle(), interativo: true)
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .help("\(info.email): conta e sair (Ajustes)")
-            }
+                .help("Ajustes")
 
-            Button { Aba.ajustes.abrir() } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 34, height: 34)
-                    .foregroundStyle(atual == .ajustes ? Tema.acento200 : Color.white)
-                    .background {
-                        if atual == .ajustes {
-                            Circle().fill(Tema.acento900)
-                            Circle().strokeBorder(Tema.acento, lineWidth: 1.5)
-                        }
-                    }
-                    .vidro(Circle(), interativo: true)
-                    .contentShape(Circle())
+                Relogio()
+                    .padding(.leading, 4)
+                    .padding(.trailing, 22)
             }
-            .buttonStyle(.plain)
-            .help("Ajustes")
-
-            Relogio()
-                .padding(.leading, 4)
         }
-        .padding(.leading, telaCheia ? 22 : 84)
-        .padding(.trailing, 22)
         .frame(height: Tema.alturaDaBarra)
         .background(alignment: .top) {
             // O degradê faz a barra se ler sobre qualquer imagem, sem caixa.

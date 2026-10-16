@@ -5,10 +5,14 @@ import AppKit
 /// trocar; com conta, o app.
 struct RaizView: View {
     @ObservedObject private var conta = Conta.shared
+    @ObservedObject private var versao = VersaoMinima.shared
 
     var body: some View {
         Group {
-            if let info = conta.info {
+            if versao.desatualizado {
+                // Bispo TV: abaixo da versão mínima do painel, nada além disto.
+                TelaAtualizar()
+            } else if let info = conta.info {
                 if info.situacao == "bloqueada" {
                     RenovarAssinaturaView()
                 } else if info.trocarSenha {
@@ -26,6 +30,7 @@ struct RaizView: View {
             }
         }
         .task { await conta.conferir() }
+        .onAppear { VersaoMinima.shared.iniciar() }
         // Nocturne: o roxo do Bispo TV no lugar do azul do sistema, em tudo.
         .tint(Tema.acento)
         .preferredColorScheme(.dark)
@@ -51,6 +56,36 @@ private struct RenovarAssinaturaView: View {
                 .padding(32)
                 .background(RoundedRectangle(cornerRadius: 14).fill(Tema.superficie))
             }
+    }
+}
+
+/// "Atualize o Bispo TV": a versão instalada ficou abaixo da mínima do painel.
+/// O botão abre o DMG já baixado pelo atualizador (e fecha o app, para o novo
+/// poder substituir o antigo) ou, sem ele, baixa pelo navegador.
+private struct TelaAtualizar: View {
+    @ObservedObject private var versao = VersaoMinima.shared
+    @ObservedObject private var atualizacao = Atualizacao.shared
+    @Environment(\.openURL) private var abrir
+
+    var body: some View {
+        CartaoConta(titulo: "Atualize o Bispo TV",
+                    subtitulo: "Esta versão (\(versao.atual)) não funciona mais. Atualize para a \(versao.minima ?? "") ou mais nova para continuar assistindo. Sua conta, favoritos e o que ficou pela metade continuam iguais.") {
+            Button("Atualizar agora") {
+                if let nova = atualizacao.disponivel {
+                    atualizacao.atualizar(nova)
+                } else {
+                    abrir(versao.baixar)
+                }
+            }
+            .buttonStyle(BotaoContornado())
+            Text("Ou baixe em \(versao.baixar.absoluteString.replacingOccurrences(of: "https://", with: "")) e arraste para Aplicativos.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .onAppear {
+            PlayerModel.shared.pararTudo()
+            // Já começa a baixar o DMG, para o botão abrir o instalador pronto.
+            atualizacao.procurar(manual: true)
+        }
     }
 }
 

@@ -85,7 +85,7 @@ final class Atualizacao: ObservableObject {
     func procurar(manual: Bool = false) {
         Task { [weak self] in
             guard let self else { return }
-            guard let lancamento = await self.buscar() else {
+            guard let lancamento = await self.buscarDaPlataforma() else {
                 if manual { self.aviso = "Não foi possível falar com o GitHub." }
                 return
             }
@@ -189,6 +189,25 @@ final class Atualizacao: ObservableObject {
     }
 
     // MARK: - GitHub
+
+    /// Desde a 2.6.0 cada app tem a sua versão: um release só da TV Box não
+    /// muda o número do Mac. Quem diz a versão do Mac é o versoes.json que o
+    /// release.sh sobe junto, não a tag; sem ele, não oferece nada.
+    private func buscarDaPlataforma() async -> Versao? {
+        guard let lancamento = await buscar(),
+              let url = URL(string: "https://github.com/\(repo)/releases/latest/download/versoes.json")
+        else { return nil }
+        var pedido = URLRequest(url: url)
+        pedido.timeoutInterval = 20
+        pedido.cachePolicy = .reloadIgnoringLocalCacheData
+        guard let (dados, resposta) = try? await URLSession.shared.data(for: pedido),
+              let http = resposta as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              let raiz = try? JSONSerialization.jsonObject(with: dados) as? [String: Any],
+              let numero = (raiz["mac"] as? String).flatMap(Self.numeroDaTag)
+        else { return nil }
+        return Versao(tag: lancamento.tag, numero: numero, notas: lancamento.notas,
+                      dmg: lancamento.dmg, tamanho: lancamento.tamanho, sha256: lancamento.sha256)
+    }
 
     private func buscar() async -> Versao? {
         guard let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest")

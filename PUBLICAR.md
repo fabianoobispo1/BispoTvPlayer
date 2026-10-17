@@ -1,10 +1,11 @@
 # Publicar uma versão nova do Bispo TV
 
-Passo a passo para lançar uma versão. Um release só leva o app do Mac
+Passo a passo para lançar uma versão. Um release leva o app do Mac
 (`BispoTv.dmg`), o do Windows (`BispoTv-Windows.zip`, de
-[BispoTvWin](https://github.com/fabianoobispo1/BispoTvWin)) e o da TV Box
+[BispoTvWin](https://github.com/fabianoobispo1/BispoTvWin)), o da TV Box
 (`BispoTv.apk`, de [BispoTvAndroid](https://github.com/fabianoobispo1/BispoTvAndroid)),
-com o mesmo número. As três pastas ficam lado a lado. O resto do projeto está no
+o do celular (`BispoTvCell.apk`) e o `versoes.json`; dá para publicar só os
+apps que mudaram (passo 4). As pastas ficam lado a lado. O resto do projeto está no
 [README](README.md).
 
 ## Uma vez só, em cada Mac
@@ -63,24 +64,40 @@ O `release.sh` faz o push; não precisa ter nada pendente além disso.
 ### 4. Publicar
 
 ```bash
-./release.sh 2.1.2                # número novo, maior que o anterior
-./release.sh 2.1.2 --rascunho     # ou como rascunho, para revisar no site antes
+./release.sh 2.6.0                  # todos os apps
+./release.sh 2.6.1 tvbox            # só a TV Box
+./release.sh 2.6.2 mac windows      # só Mac e Windows
+./release.sh 2.6.0 --rascunho       # como rascunho, para revisar no site antes
 ```
 
-O script grava a versão no `Info.plist`, no `Cargo.toml` do Windows, no Gradle
-da TV Box e no `app.json`/`package.json` do celular, monta o DMG (com o ffmpeg
-e as licenças), o zip do Windows (com o mpv e as licenças) e os dois APKs (TV
-Box e celular, assinados com as chaves próprias), commita a versão nova e dá
-push nos quatro repositórios, e cria o release `v2.1.2` com os quatro arquivos
-e as notas.
+Apps: `mac`, `windows`, `tvbox`, `celular`; sem nenhum, vão os quatro.
+
+**Cada app tem a sua versão** (desde a 2.6.0). O número é o da tag e o dos
+apps publicados nela: precisa ser maior que o do último release, mesmo que o
+app seja outro (depois de uma 2.6.1 só da TV Box, o Mac vai da 2.6.0 para a
+2.6.2). Os apps que não entram ficam com a versão que tinham.
+
+O script grava a versão só nos apps publicados (`Info.plist`, `Cargo.toml` do
+Windows, Gradle da TV Box, `app.json`/`package.json` do celular), monta os
+arquivos deles (DMG com ffmpeg e licenças, zip com mpv e licenças, APKs
+assinados com as chaves próprias), commita a versão nova e dá push nesses
+repositórios.
+
+O release **sempre leva os quatro arquivos**: os dos apps que não mudaram são
+baixados do release anterior e sobem de novo. Os atalhos do site
+(`/mac`, `/tvbox`...), o monitor "Release completo" do Kuma e os apps antigos
+procuram tudo em `/releases/latest`. Junto vai o **`versoes.json`**
+(`{"mac": "2.6.0", "windows": "2.6.0", "tvbox": "2.6.1", "celular": "2.6.0"}`):
+é por ele, e não pela tag, que cada app (2.6.0 em diante) e a página de
+download do site sabem a versão de cada plataforma. Sem ele os apps não
+oferecem atualização, então nunca crie um release à mão sem esse arquivo.
 
 Ele monta **a pasta como está**, mas só commita os arquivos de versão: antes de
-rodar, deixe `git status` limpo nos quatro apps. Mudança pendente iria para os
-usuários sem estar no Git. Se `../BispoTvWin` ou `../BispoTvAndroid` não existir, ele avisa e
-publica sem aquele app — evite: cada app procura a versão nova no mesmo
-release e ofereceria um download que não existe. Para notas
-próprias, escreva um `NOTAS.md` na raiz antes; sem ele, entram os commits desde
-a versão anterior. As instruções de instalação entram sempre.
+rodar, deixe `git status` limpo nos apps publicados. Mudança pendente iria
+para os usuários sem estar no Git. Para notas próprias, escreva um `NOTAS.md`
+na raiz antes; sem ele, entram os commits desde a versão anterior. As notas
+dizem quais apps mudaram e as versões de cada um; as instruções de instalação
+entram sempre.
 
 ### 5. Conferir
 

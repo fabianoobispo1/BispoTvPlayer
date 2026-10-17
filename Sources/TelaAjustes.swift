@@ -1,14 +1,106 @@
 import SwiftUI
 import AppKit
 
-/// Preferências do app que não moram no modelo do player.
+/// Preferências do app gravadas em disco (Application Support/BispoTv/ajustes.json)
+/// e no UserDefaults, garantindo que sobreviva a fechamento e atualização do app.
 enum Preferencias {
     private static let chaveAbrirNoCanal = "ajustes.abrirNoCanal"
+    private static let chaveUpscaling    = "ajustes.upscaling"
+    private static let chaveFillScreen   = "ajustes.fillScreen"
+    private static let chaveAlwaysOnTop  = "ajustes.alwaysOnTop"
+    private static let chaveShowStats    = "ajustes.showStats"
+    private static let chaveIsMuted      = "ajustes.isMuted"
+    private static let chaveDetachedList = "ajustes.detachedList"
+
+    static let upscalingMudou = Notification.Name("SaimoUpscalingMudou")
+
+    private static var arquivoURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
+        let dir = base.appendingPathComponent("BispoTv", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("ajustes.json")
+    }
+
+    private static func lerMapa() -> [String: Any] {
+        guard let data = try? Data(contentsOf: arquivoURL),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        return obj
+    }
+
+    private static func gravar(_ chave: String, _ valor: Any) {
+        var mapa = lerMapa()
+        mapa[chave] = valor
+        if let data = try? JSONSerialization.data(withJSONObject: mapa, options: [.prettyPrinted]) {
+            try? data.write(to: arquivoURL, options: .atomic)
+        }
+        UserDefaults.standard.set(valor, forKey: chave)
+        UserDefaults.standard.synchronize()
+    }
+
+    private static func lerBool(_ chave: String, padrao: Bool = false) -> Bool {
+        let mapa = lerMapa()
+        if let v = mapa[chave] as? Bool { return v }
+        if UserDefaults.standard.object(forKey: chave) != nil {
+            return UserDefaults.standard.bool(forKey: chave)
+        }
+        return padrao
+    }
+
+    private static func lerString(_ chave: String, padrao: String) -> String {
+        let mapa = lerMapa()
+        if let v = mapa[chave] as? String { return v }
+        return UserDefaults.standard.string(forKey: chave) ?? padrao
+    }
 
     /// Ao abrir o app: a tela inicial (como na TV) ou direto o último canal.
     static var abrirNoCanal: Bool {
-        get { UserDefaults.standard.bool(forKey: chaveAbrirNoCanal) }
-        set { UserDefaults.standard.set(newValue, forKey: chaveAbrirNoCanal) }
+        get { lerBool(chaveAbrirNoCanal) }
+        set { gravar(chaveAbrirNoCanal, newValue) }
+    }
+
+    /// Super Resolução (Upscaling): "off" (padrão), "hd" ou "4k".
+    static var upscaling: String {
+        get { lerString(chaveUpscaling, padrao: "off") }
+        set {
+            gravar(chaveUpscaling, newValue)
+            NotificationCenter.default.post(name: upscalingMudou, object: nil)
+        }
+    }
+
+    static var fillScreen: Bool {
+        get { lerBool(chaveFillScreen) }
+        set { gravar(chaveFillScreen, newValue) }
+    }
+
+    static var alwaysOnTop: Bool {
+        get { lerBool(chaveAlwaysOnTop) }
+        set { gravar(chaveAlwaysOnTop, newValue) }
+    }
+
+    static var showStats: Bool {
+        get { lerBool(chaveShowStats) }
+        set { gravar(chaveShowStats, newValue) }
+    }
+
+    static var isMuted: Bool {
+        get { lerBool(chaveIsMuted) }
+        set { gravar(chaveIsMuted, newValue) }
+    }
+
+    static var detachedList: Bool {
+        get { lerBool(chaveDetachedList) }
+        set { gravar(chaveDetachedList, newValue) }
+    }
+
+    static func rotuloUpscaling(_ modo: String) -> String {
+        switch modo {
+        case "hd": return "Nitidez HD (MetalFX · 720p → Full HD)"
+        case "4k": return "Super Resolução Ultra (MetalFX · até 4K)"
+        default:   return "Desligado"
+        }
     }
 }
 
@@ -17,7 +109,6 @@ enum Preferencias {
 struct TelaAjustes: View {
     @ObservedObject var model: PlayerModel
     @ObservedObject private var epg = EPGService.shared
-    @State private var abrirNoCanal = Preferencias.abrirNoCanal
     @ObservedObject private var conta = Conta.shared
     /// Sair pede um segundo clique, para não sair sem querer.
     @State private var confirmandoSaida = false
@@ -62,6 +153,14 @@ struct TelaAjustes: View {
                     }
 
                     secao("Reprodução") {
+                        linha("Super Resolução (Upscaling)", Preferencias.rotuloUpscaling(model.upscaling),
+                              icone: "sparkles") {
+                            switch model.upscaling {
+                            case "off": model.upscaling = "hd"
+                            case "hd":  model.upscaling = "4k"
+                            default:    model.upscaling = "off"
+                            }
+                        }
                         alternador("Preencher a tela", "Corta as bordas em vez de mostrar faixas pretas",
                                    icone: "rectangle.arrowtriangle.2.outward", valor: $model.fillScreen)
                         alternador("Manter à frente", "A janela fica por cima das outras",
@@ -73,10 +172,9 @@ struct TelaAjustes: View {
                     }
 
                     secao("Geral") {
-                        linha("Ao abrir o app", abrirNoCanal ? "Ir direto ao último canal" : "Mostrar a tela inicial",
+                        linha("Ao abrir o app", model.abrirNoCanal ? "Ir direto ao último canal" : "Mostrar a tela inicial",
                               icone: "house.fill") {
-                            abrirNoCanal.toggle()
-                            Preferencias.abrirNoCanal = abrirNoCanal
+                            model.abrirNoCanal.toggle()
                         }
                         alternador("Lista de canais em janela separada",
                                    "Uma janela ao lado do player, como antes (⇧⌘L)",

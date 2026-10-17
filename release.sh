@@ -1,17 +1,27 @@
 #!/bin/bash
 #
 # Publica uma versão: monta o DMG do Mac, o zip do Windows (de ../BispoTvWin),
-# o APK da TV Box (de ../BispoTvAndroid) e o do celular (de ../BispoTvCell), e
-# sobe os quatro no mesmo release, com o mesmo número.
+# o APK da TV Box (de ../BispoTvAndroid) e o do celular (de ../BispoTvCell).
 #
-# A versão sai do Info.plist e é gravada também no Cargo.toml do Windows e no
-# Gradle da TV Box e no app.json do celular. O nome dos arquivos é o contrato
-# com os atualizadores: o Mac procura um .dmg, o Windows o BispoTv-Windows.zip,
-# a TV Box o BispoTv.apk, o celular o BispoTvCell.apk, e o site linka os quatro.
+# Desde a 2.6.0 cada app tem a sua versão e dá para publicar só os que
+# mudaram. O release continua sempre com os quatro arquivos (os que não mudaram
+# são copiados do release anterior), porque os atalhos do site, o monitor do
+# Kuma e os apps antigos procuram tudo em /releases/latest. Junto vai o
+# versoes.json ({"mac": "2.6.0", "tvbox": "2.6.1", ...}): é nele, e não na tag,
+# que cada app confere se há versão nova para ele.
 #
-#   ./release.sh                 usa a versão do Info.plist
-#   ./release.sh 1.1.0           marca esta versão antes de publicar
-#   ./release.sh 1.1.0 --rascunho  cria como rascunho, para revisar no site
+# O nome dos arquivos é o contrato com os atualizadores: o Mac procura um .dmg,
+# o Windows o BispoTv-Windows.zip, a TV Box o BispoTv.apk, o celular o
+# BispoTvCell.apk, e o site linka os quatro.
+#
+#   ./release.sh 2.6.0                  todos os apps
+#   ./release.sh 2.6.1 tvbox            só a TV Box (os outros ficam como estão)
+#   ./release.sh 2.6.2 mac windows      só Mac e Windows
+#   ./release.sh 2.6.0 --rascunho       cria como rascunho, para revisar no site
+#
+# Apps: mac, windows, tvbox, celular. O número vale para a tag e para os apps
+# publicados nela; precisa ser maior que o do último release, mesmo que o app
+# seja outro, e nunca se reutiliza.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -21,83 +31,136 @@ TV="../BispoTvAndroid"
 CELL="../BispoTvCell"
 GRADLE="$TV/app/build.gradle.kts"
 JAVA17="/opt/homebrew/opt/openjdk@17"
+TODOS="mac windows tvbox celular"
 
 versao="${1:-}"
-if [ -n "$versao" ] && [ "${versao:0:2}" != "--" ]; then
-  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $versao" "$PLIST"
-  if [ -d "$WIN" ]; then
-    sed -i '' "1,/^version = /s/^version = \".*\"/version = \"$versao\"/" "$WIN/Cargo.toml"
-  fi
-  # O versionCode precisa só crescer, então vira um número a partir da versão:
-  # 1.2.3 -> 10203. Sem isso o Android recusa a instalação por cima.
-  codigo=$(python3 - "$versao" <<'PY'
-import sys
-p = (sys.argv[1].split(".") + ["0", "0"])[:3]
-print(int(p[0]) * 10000 + int(p[1]) * 100 + int(p[2]))
-PY
-)
-  if [ -f "$GRADLE" ]; then
-    sed -i '' "s/versionName = \".*\"/versionName = \"$versao\"/" "$GRADLE"
-    sed -i '' "s/versionCode = .*/versionCode = $codigo/" "$GRADLE"
-  fi
-  shift
-else
-  versao=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
+if ! [[ "$versao" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "uso: ./release.sh <versão> [mac] [windows] [tvbox] [celular] [--rascunho]" >&2
+  exit 1
+fi
+shift
+
+apps=""
+extra=""
+for arg in "$@"; do
+  case "$arg" in
+    --rascunho) extra="--draft" ;;
+    mac|windows|tvbox|celular) apps="$apps $arg" ;;
+    *) echo "app desconhecido: $arg (use: $TODOS)" >&2; exit 1 ;;
+  esac
+done
+[ -z "$apps" ] && apps=" $TODOS"
+publica() { [[ " $apps " == *" $1 "* ]]; }
+
+# Com o remote "upstream" (o original, do sincronizar_original.sh) o gh não
+# sabe sozinho em qual repositório publicar: é sempre no origin.
+repo="$(git remote get-url origin | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##')"
+
+anterior=$(gh release view --repo "$repo" --json tagName -q .tagName 2>/dev/null | sed 's/^v//' || true)
+maior() {   # maior <a> <b>: a > b, número a número
+  python3 -c 'import sys; f=lambda v: [int(x) for x in v.split(".")]; sys.exit(0 if f(sys.argv[1]) > f(sys.argv[2]) else 1)' "$1" "$2"
+}
+if [ -n "$anterior" ] && ! maior "$versao" "$anterior"; then
+  echo "a versão $versao precisa ser maior que a do último release ($anterior)" >&2
+  exit 1
 fi
 
-echo "==> versão $versao"
+if publica mac; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $versao" "$PLIST"
+fi
+if publica windows && [ -d "$WIN" ]; then
+  sed -i '' "1,/^version = /s/^version = \".*\"/version = \"$versao\"/" "$WIN/Cargo.toml"
+fi
+if publica tvbox && [ -f "$GRADLE" ]; then
+  # O versionCode precisa só crescer, então vira um número a partir da versão:
+  # 1.2.3 -> 10203. Sem isso o Android recusa a instalação por cima.
+  codigo=$(python3 -c 'import sys; p=(sys.argv[1].split(".")+["0","0"])[:3]; print(int(p[0])*10000+int(p[1])*100+int(p[2]))' "$versao")
+  sed -i '' "s/versionName = \".*\"/versionName = \"$versao\"/" "$GRADLE"
+  sed -i '' "s/versionCode = .*/versionCode = $codigo/" "$GRADLE"
+fi
 
-echo "==> montando o DMG"
-./make_dmg.sh >/dev/null
+echo "==> versão $versao:$apps"
+
+# Primeiro o Mac: o build.sh apaga build/ inteiro, inclusive build/release.
+if publica mac; then
+  echo "==> montando o DMG"
+  ./make_dmg.sh >/dev/null
+fi
+rm -rf build/release
 mkdir -p build/release
-cp "build/BispoTv.dmg" "build/release/BispoTv.dmg"
+publica mac && cp "build/BispoTv.dmg" "build/release/BispoTv.dmg"
 
-# A TV Box também procura a versão nova neste release (BispoTv.apk).
-if [ -d "$TV" ]; then
+# O que não for publicado agora vem do release anterior, com a versão que tinha
+# lá (do versoes.json dele; num release de antes da 2.6.0, a da tag).
+anteriores="build/anteriores"
+rm -rf "$anteriores" && mkdir -p "$anteriores"
+gh release download --repo "$repo" --pattern versoes.json --dir "$anteriores" 2>/dev/null || true
+versao_anterior() {
+  python3 -c 'import json, sys
+try: print(json.load(open(sys.argv[1]))[sys.argv[2]])
+except Exception: print(sys.argv[3])' "$anteriores/versoes.json" "$1" "$anterior"
+}
+v_mac=$versao; v_windows=$versao; v_tvbox=$versao; v_celular=$versao
+copiar() {   # copiar <app> <arquivo>
+  echo "==> $1: fica na $(versao_anterior "$1") ($2 do release anterior)"
+  gh release download --repo "$repo" --pattern "$2" --dir build/release
+}
+publica mac     || { copiar mac BispoTv.dmg;             v_mac=$(versao_anterior mac); }
+publica windows || { copiar windows BispoTv-Windows.zip; v_windows=$(versao_anterior windows); }
+publica tvbox   || { copiar tvbox BispoTv.apk;           v_tvbox=$(versao_anterior tvbox); }
+publica celular || { copiar celular BispoTvCell.apk;     v_celular=$(versao_anterior celular); }
+printf '{"mac": "%s", "windows": "%s", "tvbox": "%s", "celular": "%s"}\n' \
+  "$v_mac" "$v_windows" "$v_tvbox" "$v_celular" > build/release/versoes.json
+echo "==> versoes.json: $(cat build/release/versoes.json)"
+
+if publica tvbox; then
   echo "==> montando o APK da TV Box"
   # assembleRelease, e não Debug: o APK publicado sai assinado com a chave de
   # $TV/chaves (ver keystore.properties), que é o que permite atualizar por cima.
   ( cd "$TV" && JAVA_HOME="$JAVA17" ANDROID_HOME="$HOME/Library/Android/sdk" \
     ./gradlew assembleRelease -q --console=plain )
   cp "$TV/app/build/outputs/apk/release/app-release.apk" "build/release/BispoTv.apk"
-else
-  echo "aviso: $TV não existe; o release sai sem a TV Box" >&2
 fi
 
-# O Windows procura a versão nova neste mesmo release: um release sem o zip
-# ofereceria a quem está no Windows um download que não existe.
-if [ -d "$WIN" ]; then
+if publica windows; then
   echo "==> montando o app do Windows"
   ( cd "$WIN" && ./empacotar.sh >/dev/null )
   cp "$WIN/dist/BispoTv-Windows.zip" "build/release/BispoTv-Windows.zip"
-else
-  echo "aviso: $WIN não existe; o release sai só com o Mac" >&2
 fi
 
-# O celular também procura a versão nova neste release (BispoTvCell.apk). O
-# empacotar.sh dele grava a versão no app.json e sai com a chave de $CELL/chaves.
-if [ -d "$CELL" ]; then
+# O empacotar.sh do celular grava a versão no app.json e sai com a chave de
+# $CELL/chaves.
+if publica celular; then
   echo "==> montando o APK do celular"
   ( cd "$CELL" && ./empacotar.sh "$versao" >/dev/null )
   cp "$CELL/build/BispoTvCell.apk" "build/release/BispoTvCell.apk"
-else
-  echo "aviso: $CELL não existe; o release sai sem o celular" >&2
 fi
 
-if ls build/release/*.apk >/dev/null 2>&1; then
-  echo "==> conferindo as assinaturas"
-  APKSIGNER=$(ls "$HOME"/Library/Android/sdk/build-tools/*/apksigner | tail -1)
-  for apk in build/release/*.apk; do
-    echo "    $(basename "$apk"): $(JAVA_HOME="$JAVA17" "$APKSIGNER" verify --print-certs "$apk" 2>/dev/null \
-      | grep -m1 -o 'SHA-256 digest: .*')"
-  done
-fi
+# Um release sem algum dos quatro faria o app daquela plataforma (e o atalho
+# do site) oferecer um download que não existe.
+for arquivo in BispoTv.dmg BispoTv-Windows.zip BispoTv.apk BispoTvCell.apk; do
+  [ -f "build/release/$arquivo" ] || { echo "faltou build/release/$arquivo" >&2; exit 1; }
+done
+
+echo "==> conferindo as assinaturas"
+APKSIGNER=$(ls "$HOME"/Library/Android/sdk/build-tools/*/apksigner | tail -1)
+for apk in build/release/*.apk; do
+  echo "    $(basename "$apk"): $(JAVA_HOME="$JAVA17" "$APKSIGNER" verify --print-certs "$apk" 2>/dev/null \
+    | grep -m1 -o 'SHA-256 digest: .*')"
+done
 
 # As notas: NOTAS.md na raiz, se você escreveu uma; senão, os commits desde a
-# última versão. Fica fora de build/, que o build.sh apaga a cada montagem.
-notas="build/release/NOTAS.md"
+# última versão. Ficam em build/anteriores, fora de build/release.
+nomes() {
+  for a in $apps; do
+    case "$a" in mac) echo "Mac" ;; windows) echo "Windows" ;; tvbox) echo "TV Box" ;; celular) echo "Celular" ;; esac
+  done | paste -sd, - | sed 's/,/, /g'
+}
+notas="$anteriores/NOTAS.md"
 {
   echo "## Bispo TV $versao"
+  echo
+  echo "Nesta versão: **$(nomes)**. Versões atuais: Mac $v_mac · Windows $v_windows · TV Box $v_tvbox · Celular $v_celular."
   echo
   if [ -f NOTAS.md ]; then
     cat NOTAS.md
@@ -144,11 +207,6 @@ Windows, a pasta Licencas ao lado do programa.
 INSTALAR
 } > "$notas"
 
-extra=""
-for arg in "$@"; do
-  [ "$arg" = "--rascunho" ] && extra="--draft"
-done
-
 # A tag é criada no GitHub em cima do main de lá: a versão nova do Info.plist
 # precisa estar lá antes.
 if ! git diff --quiet -- "$PLIST"; then
@@ -156,21 +214,21 @@ if ! git diff --quiet -- "$PLIST"; then
 fi
 echo "==> enviando para o GitHub"
 git push -q origin HEAD
-if [ -d "$WIN" ]; then
+if publica windows; then
   ( cd "$WIN"
     if ! git diff --quiet -- Cargo.toml Cargo.lock; then
       git commit -q -m "Versão $versao" -- Cargo.toml Cargo.lock
     fi
     git push -q origin HEAD )
 fi
-if [ -d "$TV" ]; then
+if publica tvbox; then
   ( cd "$TV"
     if ! git diff --quiet -- app/build.gradle.kts; then
       git commit -q -m "Versão $versao" -- app/build.gradle.kts
     fi
     git push -q origin HEAD )
 fi
-if [ -d "$CELL" ]; then
+if publica celular; then
   ( cd "$CELL"
     if ! git diff --quiet -- app.json package.json; then
       git commit -q -m "Versão $versao" -- app.json package.json
@@ -178,17 +236,14 @@ if [ -d "$CELL" ]; then
     git push -q origin HEAD )
 fi
 
-# Com o remote "upstream" (o original, do sincronizar_original.sh) o gh não
-# sabe sozinho em qual repositório publicar: é sempre no origin.
-repo="$(git remote get-url origin | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##')"
-
 echo "==> publicando v$versao em $repo"
 gh release create "v$versao" --repo "$repo" \
   --target "$(git rev-parse HEAD)" \
   --title "Bispo TV $versao" \
   --notes-file "$notas" \
   $extra \
-  build/release/BispoTv.dmg \
-  $(ls build/release/*.zip build/release/*.apk 2>/dev/null)
+  build/release/BispoTv.dmg build/release/BispoTv-Windows.zip \
+  build/release/BispoTv.apk build/release/BispoTvCell.apk \
+  build/release/versoes.json
 
 echo "pronto: https://github.com/$repo/releases/tag/v$versao"

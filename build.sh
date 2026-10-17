@@ -36,6 +36,10 @@ swiftc \
   -framework AVFoundation \
   -framework SwiftUI \
   -framework AppKit \
+  -framework Metal \
+  -framework MetalFX \
+  -framework QuartzCore \
+  -framework CoreVideo \
   -o "$APP/Contents/MacOS/BispoTv" \
   Sources/*.swift build/TMDBChave.swift
 

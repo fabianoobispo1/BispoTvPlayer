@@ -10,6 +10,10 @@ import AppKit
 ///
 /// Tudo é fogo e esquece: sem rede, o monitor fica sem o dado e o player segue
 /// igual.
+///
+/// Só os aparelhos da amostra (ver `Amostra`) falam com o monitor; os outros
+/// não mandam nada — nem olá, nem batida, nem evento —, menos o relatório de
+/// quebra, que vale de todo mundo.
 @MainActor
 final class Telemetria {
     static let shared = Telemetria()
@@ -37,6 +41,21 @@ final class Telemetria {
     private var batida: Timer?
     private var intervalo: TimeInterval = 300
     private var iniciado = false
+    private var cumprimentou = false
+    /// O olá do monitor pode dizer de que lado este aparelho está; vale mais
+    /// que a conta daqui enquanto o app estiver aberto.
+    private var amostraDoServidor: Bool?
+    private var pct = Amostra.pct
+    /// Batida extra (pausa, troca de título, parada) no máximo a cada 30 s:
+    /// quem zapeia ou pausa e volta não vira uma rajada de pedidos.
+    private let intervaloExtra: TimeInterval = 30
+    private var ultimaBatida: Date = .distantPast
+
+    /// Este aparelho entra na amostra?
+    private var naAmostra: Bool {
+        if Amostra.bispoTv { return true }
+        return amostraDoServidor ?? Amostra.amostrado(id, pct: pct)
+    }
 
     private lazy var id: String = {
         let chave = "telemetria.id"
@@ -56,6 +75,25 @@ final class Telemetria {
     func iniciar() {
         guard !iniciado else { return }
         iniciado = true
+        cumprimentar()
+        enviarCrashesAnteriores()
+        agendar()
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.encerrar() }
+            }
+        // O percentual da amostra, uma vez por dia; se mudou e este aparelho
+        // passou a entrar, o olá sai agora.
+        Task { @MainActor [weak self] in
+            guard let novo = await Amostra.atualizar(), let self else { return }
+            self.pct = novo
+            self.cumprimentar()
+        }
+    }
+
+    private func cumprimentar() {
+        guard naAmostra, !cumprimentou else { return }
+        cumprimentou = true
         enviar("hello", [
             "version": versao,
             "model": Self.modelo(),
@@ -63,17 +101,17 @@ final class Telemetria {
             "screen": Self.tela(),
             "lang": Locale.preferredLanguages.first ?? ""
         ]) { [weak self] corpo in
-            if let s = corpo?["heartbeatSeconds"] as? Double, (60...3600).contains(s) {
-                self?.intervalo = s
-                self?.agendar()
+            guard let self, let corpo else { return }
+            if let s = corpo["heartbeatSeconds"] as? Double, (60...3600).contains(s) {
+                self.intervalo = s
+                self.agendar()
             }
+            if let novo = Amostra.valido(corpo["amostraPct"]) {
+                self.pct = novo
+                Amostra.guardar(novo)
+            }
+            if let dentro = corpo["amostra"] as? Bool { self.amostraDoServidor = dentro }
         }
-        enviarCrashesAnteriores()
-        agendar()
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.encerrar() }
-            }
     }
 
     private func agendar() {
@@ -89,7 +127,12 @@ final class Telemetria {
         if tocando != nil { evento("play_stop", esperar: true) }
     }
 
-    private func baterAgora(esperar: Bool = false) {
+    /// `extra` é a batida fora do relógio (pausa, troca, parada): sai no
+    /// máximo uma a cada 30 s. A do relógio e a do fechamento saem sempre.
+    private func baterAgora(esperar: Bool = false, extra: Bool = false) {
+        guard naAmostra else { return }
+        if extra, Date().timeIntervalSince(ultimaBatida) < intervaloExtra { return }
+        ultimaBatida = Date()
         let segundos = tocando == nil ? 0 : Int(rodando)
         acumulado = 0
         if rodandoDesde != nil { rodandoDesde = Date() }
@@ -140,7 +183,7 @@ final class Telemetria {
         }
         if rodando, pausado != self.pausado {
             self.pausado = pausado
-            baterAgora()
+            baterAgora(extra: true)
         }
     }
 
@@ -174,7 +217,7 @@ final class Telemetria {
         // primeira abertura de cada sessão se perdia.
         iniciar()
         if let anterior = tocando, anterior.titulo != titulo, rodando >= minimoParaContar {
-            baterAgora()
+            baterAgora(extra: true)
         }
         if tocando?.titulo != titulo {
             acumulado = 0
@@ -201,7 +244,7 @@ final class Telemetria {
 
     func parou() {
         guard tocando != nil else { return }
-        if rodando >= minimoParaContar { baterAgora() }
+        if rodando >= minimoParaContar { baterAgora(extra: true) }
         tocando = nil
         acumulado = 0
         rodandoDesde = nil

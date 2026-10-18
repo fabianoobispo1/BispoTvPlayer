@@ -77,10 +77,13 @@ final class Upstream: @unchecked Sendable {
         return URL(string: texto.replacingCharacters(in: inicio..<fim, with: aberto)) ?? url
     }
 
-    func fetch(_ endereco: URL, method: String = "GET", referer: String? = nil) throws -> UpstreamResponse {
+    /// `agente` troca o User-Agent de sempre (o do Safari) só neste pedido:
+    /// o Bispo TV Connect pede a lista com o mesmo agente que o celular usa.
+    func fetch(_ endereco: URL, method: String = "GET", referer: String? = nil,
+               agente: String? = nil) throws -> UpstreamResponse {
         let url = Upstream.hostLegivel(endereco)
         do {
-            return try fetchViaURLSession(url, method: method, referer: referer)
+            return try fetchViaURLSession(url, method: method, referer: referer, agente: agente)
         } catch let e as NSError where e.domain == NSURLErrorDomain
             && (e.code == NSURLErrorCannotFindHost || e.code == NSURLErrorDNSLookupFailed) {
             Log.shared.write("DNS do sistema bloqueou \(url.host ?? "?") — usando DoH")
@@ -90,10 +93,12 @@ final class Upstream: @unchecked Sendable {
 
     // MARK: - URLSession path
 
-    private func fetchViaURLSession(_ url: URL, method: String, referer: String?) throws -> UpstreamResponse {
+    private func fetchViaURLSession(_ url: URL, method: String, referer: String?,
+                                    agente: String? = nil) throws -> UpstreamResponse {
         var req = URLRequest(url: url)
         req.httpMethod = method
         if let referer { req.setValue(referer, forHTTPHeaderField: "Referer") }
+        if let agente { req.setValue(agente, forHTTPHeaderField: "User-Agent") }
 
         let sem = DispatchSemaphore(value: 0)
         // Com trava, e não uma variável solta: se o tempo estourar, a resposta

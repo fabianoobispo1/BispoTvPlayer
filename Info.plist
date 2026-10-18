@@ -32,11 +32,12 @@
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_googlecast._tcp</string>
+		<string>_bispotv._tcp</string>
 	</array>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Encontrar Chromecast e aparelhos Google TV na sua rede para transmitir os canais.</string>
+	<string>Encontrar Chromecast e aparelhos Google TV na sua rede para transmitir os canais, e deixar o celular com o app Bispo TV controlar o Mac pelo Bispo TV Connect.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

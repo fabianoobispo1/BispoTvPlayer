@@ -36,6 +36,11 @@ renomear() {
       -e 's#build/Saimo TV\.app#build/Bispo TV.app#g' \
       -e 's#SaimoTV-Catalog#BispoTv-Catalog#g' \
       -e 's#dev\.saimo\.#dev.bispotv.#g' \
+      -e 's#Saimo Connect#Bispo TV Connect#g' \
+      -e 's#o app Saimo #o app Bispo TV #g' \
+      -e "s#\"saimo-tv\"#\"bispotv\"#g" \
+      -e 's#_saimotv\._tcp#_bispotv._tcp#g' \
+      -e 's#[[:<:]]8999[[:>:]]#8988#g' \
       -e 's#Saimo TV#Bispo TV#g' \
       -e 's#SAIMO TV#BISPO TV#g' \
       -e 's#SaimoApp#BispoTvApp#g' \

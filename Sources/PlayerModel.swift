@@ -50,6 +50,10 @@ final class PlayerModel: NSObject, ObservableObject {
     /// Sem som enquanto a abertura do app está na tela: o último canal já
     /// abre por baixo dela. Não é guardado, ao contrário do mudo.
     var silenciadoPelaAbertura = false { didSet { applyVolume() } }
+    /// O som do Mac fixado pelo Bispo TV Connect: "0" (tela principal), "1"
+    /// (segunda tela) ou "mute". Nulo segue a regra de sempre — o som vai com
+    /// a tela ativa. Ver SaimoConnect.swift.
+    var somDoConnect: String? { didSet { applyVolume() } }
     @Published var rate: Float = 1.0 { didSet { if isPlaying { player.rate = rate } } }
     @Published var fillScreen: Bool = Preferencias.fillScreen {
         didSet { Preferencias.fillScreen = fillScreen }
@@ -273,7 +277,9 @@ final class PlayerModel: NSObject, ObservableObject {
         vigiarFontesDesativadas()
     }
 
-    /// Relê a lista de servidores desligados de dois em dois minutos.
+    /// Confere a lista de servidores desligados de dez em dez minutos — ela
+    /// só vai à rede quando a guardada passou de uma hora (ver
+    /// `FontesDesativadas.validade`).
     ///
     /// Desligar um provedor no painel tem que valer sem ninguém fechar o app:
     /// quem está assistindo quando a fonte morre é justamente quem precisa que
@@ -284,7 +290,7 @@ final class PlayerModel: NSObject, ObservableObject {
                 if await FontesDesativadas.atualizar() {
                     self?.refreshCatalog()
                 }
-                try? await Task.sleep(nanoseconds: 120 * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: 600 * 1_000_000_000)
             }
         }
     }
@@ -529,6 +535,37 @@ final class PlayerModel: NSObject, ObservableObject {
         Telemetria.shared.comecou(.vod, nome, url: primeira, fonte: 1)
     }
 
+    /// Onde o próximo arquivo aberto deve começar, em segundos, no lugar do
+    /// ponto guardado. É o "começar em" do Bispo TV Connect.
+    var inicioPedido: Double?
+
+    /// O endereço de origem do arquivo no ar (sem o atalho local).
+    var fonteDoArquivoNoAr: URL? {
+        fileSources.indices.contains(fileSourceIndex) ? fileSources[fileSourceIndex] : nil
+    }
+
+    /// Troca a fonte do arquivo no ar pela seguinte (ou anterior), do mesmo
+    /// ponto. É o "trocar fonte" do Bispo TV Connect num filme ou episódio.
+    func trocarFonteDoArquivo(_ delta: Int) {
+        guard playingFile != nil, fileSources.count > 1 else { return }
+        let retomar = position
+        fileSourceIndex = ((fileSourceIndex + delta) % fileSources.count + fileSources.count) % fileSources.count
+        let proxima = fileSources[fileSourceIndex]
+        let preparada = fonteDeArquivo(proxima)
+        fonteViaProxy = preparada.peloProxy
+        playingFile = preparada.url
+        generatedLink = preparada.url
+        sourceIndex = fileSourceIndex
+        sourceHost = proxima.host ?? ""
+        playedSinceOpen = false
+        retomou = true
+        reconnectAttempt = 0
+        status = "carregando…"
+        Log.shared.write("\(playingFileName): fonte \(fileSourceIndex + 1) de \(fileSources.count)")
+        load(preparada.url, channel: nil)
+        if retomar > 5 { seekQuandoPuder(retomar) }
+    }
+
     func playVariant(_ channel: Channel, index: Int) {
         ProxyServer.shared.forceVariant(channel, index)
         if selection != channel.id {
@@ -620,10 +657,12 @@ final class PlayerModel: NSObject, ObservableObject {
             sourcesTried = 0
             playedSinceOpen = true
             stalledSince = nil
-            // Volta ao ponto em que parou, uma vez só por abertura.
-            if playingFile != nil, !retomou, !chaveArquivo.isEmpty {
+            // Volta ao ponto em que parou, uma vez só por abertura. O ponto
+            // pedido pelo celular (Bispo TV Connect) vale mais que o guardado.
+            if playingFile != nil, !retomou, !chaveArquivo.isEmpty || inicioPedido != nil {
                 retomou = true
-                let ponto = Progresso.posicao(chaveArquivo)
+                let ponto = inicioPedido ?? Progresso.posicao(chaveArquivo)
+                inicioPedido = nil
                 if ponto > 0 { seekQuandoPuder(ponto) }
             }
             Log.shared.write("pronto — reproduzindo")
@@ -1380,9 +1419,15 @@ final class PlayerModel: NSObject, ObservableObject {
     func applyVolume() {
         // Na multi tela só a tela ativa tem som. Enquanto a segunda não tem
         // canal, o som continua com a principal.
-        let somNaSegunda = multiTela && segundaAtiva && segunda.canal != nil
+        var somNaSegunda = multiTela && segundaAtiva && segunda.canal != nil
         player.volume = Float(volume)
-        let mudo = isMuted || silenciadoPelaAbertura
+        var mudo = isMuted || silenciadoPelaAbertura
+        // O celular escolheu de qual tela o Mac toca o som (ou calou o Mac),
+        // por exemplo para ouvir a outra no fone.
+        if let fixo = somDoConnect {
+            if fixo == "mute" { mudo = true }
+            else if multiTela { somNaSegunda = fixo == "1" && segunda.canal != nil }
+        }
         player.isMuted = mudo || somNaSegunda
         segunda.aplicarSom(volume: volume, mudo: mudo || !somNaSegunda)
         Store.setVolume(volume)

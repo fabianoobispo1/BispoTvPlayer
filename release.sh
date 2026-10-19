@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # Publica uma versão: monta o DMG do Mac, o zip do Windows (de ../BispoTvWin),
-# o APK da TV Box (de ../BispoTvAndroid) e o do celular (de ../BispoTvCell).
+# o APK da TV Box (de ../BispoTvAndroid), o do celular (de ../BispoTvCell) e os
+# pacotes das TVs Samsung e LG (de ../BispoTvWeb, scripts/montar_tv.sh).
 #
 # Desde a 2.6.0 cada app tem a sua versão e dá para publicar só os que
 # mudaram. O release continua sempre com os quatro arquivos (os que não mudaram
@@ -19,7 +20,7 @@
 #   ./release.sh 2.6.2 mac windows      só Mac e Windows
 #   ./release.sh 2.6.0 --rascunho       cria como rascunho, para revisar no site
 #
-# Apps: mac, windows, tvbox, celular. O número vale para a tag e para os apps
+# Apps: mac, windows, tvbox, celular, tvs (Samsung e LG juntas). O número vale para a tag e para os apps
 # publicados nela; precisa ser maior que o do último release, mesmo que o app
 # seja outro, e nunca se reutiliza.
 set -euo pipefail
@@ -29,13 +30,14 @@ PLIST="Info.plist"
 WIN="../BispoTvWin"
 TV="../BispoTvAndroid"
 CELL="../BispoTvCell"
+WEB="../BispoTvWeb"
 GRADLE="$TV/app/build.gradle.kts"
 JAVA17="/opt/homebrew/opt/openjdk@17"
-TODOS="mac windows tvbox celular"
+TODOS="mac windows tvbox celular tvs"
 
 versao="${1:-}"
 if ! [[ "$versao" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "uso: ./release.sh <versão> [mac] [windows] [tvbox] [celular] [--rascunho]" >&2
+  echo "uso: ./release.sh <versão> [mac] [windows] [tvbox] [celular] [tvs] [--rascunho]" >&2
   exit 1
 fi
 shift
@@ -45,7 +47,7 @@ extra=""
 for arg in "$@"; do
   case "$arg" in
     --rascunho) extra="--draft" ;;
-    mac|windows|tvbox|celular) apps="$apps $arg" ;;
+    mac|windows|tvbox|celular|tvs) apps="$apps $arg" ;;
     *) echo "app desconhecido: $arg (use: $TODOS)" >&2; exit 1 ;;
   esac
 done
@@ -78,6 +80,10 @@ if publica tvbox && [ -f "$GRADLE" ]; then
   sed -i '' "s/versionName = \".*\"/versionName = \"$versao\"/" "$GRADLE"
   sed -i '' "s/versionCode = .*/versionCode = $codigo/" "$GRADLE"
 fi
+# As TVs levam a versão do package.json do site (a casca; o app vem do site).
+if publica tvs; then
+  ( cd "$WEB" && npm version "$versao" --no-git-tag-version --allow-same-version >/dev/null )
+fi
 
 echo "==> versão $versao:$apps"
 
@@ -100,7 +106,7 @@ versao_anterior() {
 try: print(json.load(open(sys.argv[1]))[sys.argv[2]])
 except Exception: print(sys.argv[3])' "$anteriores/versoes.json" "$1" "$anterior"
 }
-v_mac=$versao; v_windows=$versao; v_tvbox=$versao; v_celular=$versao
+v_mac=$versao; v_windows=$versao; v_tvbox=$versao; v_celular=$versao; v_tvs=$versao
 copiar() {   # copiar <app> <arquivo>
   echo "==> $1: fica na $(versao_anterior "$1") ($2 do release anterior)"
   gh release download --repo "$repo" --pattern "$2" --dir build/release
@@ -109,8 +115,13 @@ publica mac     || { copiar mac BispoTv.dmg;             v_mac=$(versao_anterior
 publica windows || { copiar windows BispoTv-Windows.zip; v_windows=$(versao_anterior windows); }
 publica tvbox   || { copiar tvbox BispoTv.apk;           v_tvbox=$(versao_anterior tvbox); }
 publica celular || { copiar celular BispoTvCell.apk;     v_celular=$(versao_anterior celular); }
-printf '{"mac": "%s", "windows": "%s", "tvbox": "%s", "celular": "%s"}\n' \
-  "$v_mac" "$v_windows" "$v_tvbox" "$v_celular" > build/release/versoes.json
+if ! publica tvs; then
+  copiar tvs BispoTv-Samsung.wgt
+  gh release download --repo "$repo" --pattern BispoTv-LG.ipk --dir build/release
+  v_tvs=$(versao_anterior samsung)
+fi
+printf '{"mac": "%s", "windows": "%s", "tvbox": "%s", "celular": "%s", "samsung": "%s", "lg": "%s"}\n' \
+  "$v_mac" "$v_windows" "$v_tvbox" "$v_celular" "$v_tvs" "$v_tvs" > build/release/versoes.json
 echo "==> versoes.json: $(cat build/release/versoes.json)"
 
 if publica tvbox; then
@@ -136,9 +147,15 @@ if publica celular; then
   cp "$CELL/build/BispoTvCell.apk" "build/release/BispoTvCell.apk"
 fi
 
-# Um release sem algum dos quatro faria o app daquela plataforma (e o atalho
+if publica tvs; then
+  echo "==> montando os pacotes das TVs Samsung e LG"
+  ( cd "$WEB" && bash scripts/montar_tv.sh >/dev/null )
+  cp "$WEB/build/tv/BispoTv-Samsung.wgt" "$WEB/build/tv/BispoTv-LG.ipk" build/release/
+fi
+
+# Um release sem algum dos arquivos faria o app daquela plataforma (e o atalho
 # do site) oferecer um download que não existe.
-for arquivo in BispoTv.dmg BispoTv-Windows.zip BispoTv.apk BispoTvCell.apk; do
+for arquivo in BispoTv.dmg BispoTv-Windows.zip BispoTv.apk BispoTvCell.apk BispoTv-Samsung.wgt BispoTv-LG.ipk; do
   [ -f "build/release/$arquivo" ] || { echo "faltou build/release/$arquivo" >&2; exit 1; }
 done
 
@@ -153,14 +170,14 @@ done
 # última versão. Ficam em build/anteriores, fora de build/release.
 nomes() {
   for a in $apps; do
-    case "$a" in mac) echo "Mac" ;; windows) echo "Windows" ;; tvbox) echo "TV Box" ;; celular) echo "Celular" ;; esac
+    case "$a" in mac) echo "Mac" ;; windows) echo "Windows" ;; tvbox) echo "TV Box" ;; celular) echo "Celular" ;; tvs) echo "TVs Samsung e LG" ;; esac
   done | paste -sd, - | sed 's/,/, /g'
 }
 notas="$anteriores/NOTAS.md"
 {
   echo "## Bispo TV $versao"
   echo
-  echo "Nesta versão: **$(nomes)**. Versões atuais: Mac $v_mac · Windows $v_windows · TV Box $v_tvbox · Celular $v_celular."
+  echo "Nesta versão: **$(nomes)**. Versões atuais: Mac $v_mac · Windows $v_windows · TV Box $v_tvbox · Celular $v_celular · TVs Samsung e LG $v_tvs."
   echo
   if [ -f NOTAS.md ]; then
     cat NOTAS.md
@@ -201,6 +218,12 @@ notas="$anteriores/NOTAS.md"
 2. Abra o arquivo baixado e, se o Android pedir, permita instalar apps do
    navegador.
 
+**TV Samsung e TV LG** (2020 em diante, **em teste**: ainda não foram
+instalados numa TV de verdade): exigem o modo desenvolvedor da TV e um
+computador na mesma rede. O passo a passo está em `bispotv.pages.dev/app`, nas
+abas Samsung e LG. O `BispoTv-Samsung.wgt` sai sem assinatura: assine com o
+certificado da sua TV no Tizen Studio antes de instalar.
+
 As licenças do FFmpeg (Mac) e do mpv (Windows) vão junto: no Mac, botão direito
 no Bispo TV › Mostrar Conteúdo do Pacote › Contents › Resources › Licencas; no
 Windows, a pasta Licencas ao lado do programa.
@@ -235,6 +258,14 @@ if publica celular; then
     fi
     git push -q origin HEAD )
 fi
+# O push do site também publica o código novo das TVs em /tv/ (Cloudflare Pages).
+if publica tvs; then
+  ( cd "$WEB"
+    if ! git diff --quiet -- package.json package-lock.json; then
+      git commit -q -m "Versão $versao" -- package.json package-lock.json
+    fi
+    git push -q origin HEAD )
+fi
 
 echo "==> publicando v$versao em $repo"
 gh release create "v$versao" --repo "$repo" \
@@ -244,6 +275,7 @@ gh release create "v$versao" --repo "$repo" \
   $extra \
   build/release/BispoTv.dmg build/release/BispoTv-Windows.zip \
   build/release/BispoTv.apk build/release/BispoTvCell.apk \
+  build/release/BispoTv-Samsung.wgt build/release/BispoTv-LG.ipk \
   build/release/versoes.json
 
 echo "pronto: https://github.com/$repo/releases/tag/v$versao"

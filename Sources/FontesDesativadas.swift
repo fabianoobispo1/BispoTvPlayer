@@ -19,7 +19,7 @@ import os
 enum FontesDesativadas {
 
     private static let endereco = URL(
-        string: "https://raw.githubusercontent.com/fabianoobispo1/BispoTvPlayer/main/fontes-desativadas.json")!
+        string: "https://raw.githubusercontent.com/fabianoobispo1/BispoTv-downloads/main/fontes-desativadas.json")!
     /// Desligar um servidor tem que valer em minutos, que é o tempo que alguém
     /// aguenta um canal quebrado.
     private static let validade: TimeInterval = 120

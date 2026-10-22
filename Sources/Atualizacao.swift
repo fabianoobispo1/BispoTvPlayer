@@ -34,8 +34,8 @@ final class Atualizacao: ObservableObject {
         var id: String { tag }
         /// A página da versão, para quando o download aqui dentro falha.
         var pagina: URL {
-            URL(string: "https://github.com/fabianoobispo1/BispoTvPlayer/releases/tag/\(tag)")
-                ?? URL(string: "https://github.com/fabianoobispo1/BispoTvPlayer/releases/latest")!
+            URL(string: "https://github.com/fabianoobispo1/BispoTv-downloads/releases/tag/\(tag)")
+                ?? URL(string: "https://github.com/fabianoobispo1/BispoTv-downloads/releases/latest")!
         }
     }
 
@@ -55,7 +55,7 @@ final class Atualizacao: ObservableObject {
     private var baixandoTag: String?
     private var baixador: BaixadorDeAtualizacao?
 
-    private let repo = "fabianoobispo1/BispoTvPlayer"
+    private let repo = "fabianoobispo1/BispoTv-downloads"
     private let defaults = UserDefaults.standard
     private let chavePulada = "atualizacaoPulada"
     private let intervalo: UInt64 = 60 * 60

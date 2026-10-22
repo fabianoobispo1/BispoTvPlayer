@@ -54,11 +54,23 @@ done
 [ -z "$apps" ] && apps=" $TODOS"
 publica() { [[ " $apps " == *" $1 "* ]]; }
 
-# Com o remote "upstream" (o original, do sincronizar_original.sh) o gh não
-# sabe sozinho em qual repositório publicar: é sempre no origin.
-repo="$(git remote get-url origin | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##')"
+# Desde a 2.9.1 os releases ficam num repositório público só de downloads (sem
+# código nem histórico), e este, o do código, pode ficar privado. Os apps e o
+# site leem os arquivos e o versoes.json de lá.
+repo="fabianoobispo1/BispoTv-downloads"
+# Na transição, o mesmo release sai também aqui, para quem ainda está numa
+# versão que procura atualização no BispoTvPlayer. Deixe vazio quando este
+# repositório ficar privado.
+ESPELHO="fabianoobispo1/BispoTvPlayer"
 
 anterior=$(gh release view --repo "$repo" --json tagName -q .tagName 2>/dev/null | sed 's/^v//' || true)
+# O primeiro release do repositório de downloads copia do espelho o que não for publicado.
+if [ -z "$anterior" ] && [ -n "$ESPELHO" ]; then
+  repo_anterior="$ESPELHO"
+  anterior=$(gh release view --repo "$ESPELHO" --json tagName -q .tagName 2>/dev/null | sed 's/^v//' || true)
+else
+  repo_anterior="$repo"
+fi
 maior() {   # maior <a> <b>: a > b, número a número
   python3 -c 'import sys; f=lambda v: [int(x) for x in v.split(".")]; sys.exit(0 if f(sys.argv[1]) > f(sys.argv[2]) else 1)' "$1" "$2"
 }
@@ -100,7 +112,7 @@ publica mac && cp "build/BispoTv.dmg" "build/release/BispoTv.dmg"
 # lá (do versoes.json dele; num release de antes da 2.6.0, a da tag).
 anteriores="build/anteriores"
 rm -rf "$anteriores" && mkdir -p "$anteriores"
-gh release download --repo "$repo" --pattern versoes.json --dir "$anteriores" 2>/dev/null || true
+gh release download --repo "$repo_anterior" --pattern versoes.json --dir "$anteriores" 2>/dev/null || true
 versao_anterior() {
   python3 -c 'import json, sys
 try: print(json.load(open(sys.argv[1]))[sys.argv[2]])
@@ -109,7 +121,7 @@ except Exception: print(sys.argv[3])' "$anteriores/versoes.json" "$1" "$anterior
 v_mac=$versao; v_windows=$versao; v_tvbox=$versao; v_celular=$versao; v_tvs=$versao
 copiar() {   # copiar <app> <arquivo>
   echo "==> $1: fica na $(versao_anterior "$1") ($2 do release anterior)"
-  gh release download --repo "$repo" --pattern "$2" --dir build/release
+  gh release download --repo "$repo_anterior" --pattern "$2" --dir build/release
 }
 publica mac     || { copiar mac BispoTv.dmg;             v_mac=$(versao_anterior mac); }
 publica windows || { copiar windows BispoTv-Windows.zip; v_windows=$(versao_anterior windows); }
@@ -117,7 +129,7 @@ publica tvbox   || { copiar tvbox BispoTv.apk;           v_tvbox=$(versao_anteri
 publica celular || { copiar celular BispoTvCell.apk;     v_celular=$(versao_anterior celular); }
 if ! publica tvs; then
   copiar tvs BispoTv-Samsung.wgt
-  gh release download --repo "$repo" --pattern BispoTv-LG.ipk --dir build/release
+  gh release download --repo "$repo_anterior" --pattern BispoTv-LG.ipk --dir build/release
   v_tvs=$(versao_anterior samsung)
 fi
 printf '{"mac": "%s", "windows": "%s", "tvbox": "%s", "celular": "%s", "samsung": "%s", "lg": "%s"}\n' \
@@ -267,15 +279,27 @@ if publica tvs; then
     git push -q origin HEAD )
 fi
 
+arquivos=(build/release/BispoTv.dmg build/release/BispoTv-Windows.zip
+          build/release/BispoTv.apk build/release/BispoTvCell.apk
+          build/release/BispoTv-Samsung.wgt build/release/BispoTv-LG.ipk
+          build/release/versoes.json)
+
+# No repositório de downloads a tag fica no commit dele (main), não no código.
 echo "==> publicando v$versao em $repo"
 gh release create "v$versao" --repo "$repo" \
-  --target "$(git rev-parse HEAD)" \
   --title "Bispo TV $versao" \
   --notes-file "$notas" \
   $extra \
-  build/release/BispoTv.dmg build/release/BispoTv-Windows.zip \
-  build/release/BispoTv.apk build/release/BispoTvCell.apk \
-  build/release/BispoTv-Samsung.wgt build/release/BispoTv-LG.ipk \
-  build/release/versoes.json
+  "${arquivos[@]}"
+
+if [ -n "$ESPELHO" ]; then
+  echo "==> espelhando v$versao em $ESPELHO (transição)"
+  gh release create "v$versao" --repo "$ESPELHO" \
+    --target "$(git rev-parse HEAD)" \
+    --title "Bispo TV $versao" \
+    --notes-file "$notas" \
+    $extra \
+    "${arquivos[@]}"
+fi
 
 echo "pronto: https://github.com/$repo/releases/tag/v$versao"

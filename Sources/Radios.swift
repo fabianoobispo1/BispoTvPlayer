@@ -56,7 +56,7 @@ final class Radios: ObservableObject {
     private var buscou = false
 
     private static let endereco = URL(
-        string: "https://raw.githubusercontent.com/gabrielsaimo/SaimoPlayer/main/vod/radios.txt")!
+        string: "https://filmes-saimo.pages.dev/radios.txt")!
 
     private static var arquivo: URL {
         let pasta = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]

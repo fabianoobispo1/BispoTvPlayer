@@ -39,7 +39,7 @@ enum Vod {
     /// repositório original do Saimo TV, que o mantém atualizado — assim como
     /// os canais ao vivo (RemoteCatalog).
     private static let base =
-        "https://raw.githubusercontent.com/gabrielsaimo/SaimoPlayer/main/vod/"
+        "https://filmes-saimo.pages.dev/"
 
     struct Gaveta: Identifiable, Hashable {
         var letra: String
